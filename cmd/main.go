@@ -12,11 +12,11 @@ import (
 	"warehouse-controller/internal/config"
 	"warehouse-controller/internal/handler"
 	"warehouse-controller/internal/service"
-	"warehouse-controller/internal/sqlc"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -63,9 +63,14 @@ func main() {
 	defer pool.Close()
 	zapLog.Info("database connected")
 
+	// redis cache
+	rdb := redis.NewClient(&redis.Options{
+		Addr: cfg.REDIS_URL,
+	})
+	zapLog.Info("redis client created")
+
 	// dependencies
-	queries := sqlc.New(pool)
-	svc := service.NewWarehouseService(pool, queries, zapLog)
+	svc := service.NewWarehouseService(pool, rdb, zapLog)
 	h := handler.NewWarehouseHandler(svc, zapLog)
 
 	// app
