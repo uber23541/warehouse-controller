@@ -9,8 +9,10 @@ import (
 	"syscall"
 
 	"warehouse-controller/internal/app"
+	"warehouse-controller/internal/cache"
 	"warehouse-controller/internal/config"
 	"warehouse-controller/internal/handler"
+	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/service"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -70,7 +72,9 @@ func main() {
 	zapLog.Info("redis client created")
 
 	// dependencies
-	svc := service.NewWarehouseService(pool, rdb, zapLog)
+	repo := repo.New(pool)
+	cache := cache.New(rdb)
+	svc := service.NewWarehouseService(repo, cache, zapLog)
 	h := handler.NewWarehouseHandler(svc, zapLog)
 
 	// app
