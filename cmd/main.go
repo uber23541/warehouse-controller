@@ -2,23 +2,13 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
-	"net/http"
 	"os/signal"
 	"syscall"
 
 	"warehouse-controller/internal/app"
-	"warehouse-controller/internal/cache"
 	"warehouse-controller/internal/config"
-	"warehouse-controller/internal/handler"
-	"warehouse-controller/internal/repo"
-	"warehouse-controller/internal/service"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -33,67 +23,24 @@ func main() {
 	}
 
 	var level zapcore.Level
-	if err := level.UnmarshalText([]byte(cfg.LOG_LEVEL)); err != nil {
+	if err := level.UnmarshalText([]byte(cfg.Log.Level)); err != nil {
 		level = zapcore.InfoLevel
 	}
-
-	zapLog, err := zap.NewProduction(zap.IncreaseLevel(level))
+	logger, err := zap.NewProduction(zap.IncreaseLevel(level))
 	if err != nil {
 		log.Fatalf("zap.NewProduction: %v", err)
 	}
-	defer zapLog.Sync()
+	defer logger.Sync()
 
-	// migrations
-	db, err := sql.Open("pgx", cfg.DB_DSN)
+	if err := app.RunMigrations(cfg.DB.DSN); err != nil {
+		logger.Fatal("migrations", zap.Error(err))
+	}
+	logger.Info("migrations applied")
+
+	a, err := app.Build(ctx, cfg, logger)
 	if err != nil {
-		zapLog.Fatal("failed to open db for migrations", zap.Error(err))
-	}
-	if err := goose.SetDialect("postgres"); err != nil {
-		zapLog.Fatal("goose dialect", zap.Error(err))
-	}
-	if err := goose.Up(db, "db/migrations"); err != nil {
-		zapLog.Fatal("goose up", zap.Error(err))
-	}
-	db.Close()
-	zapLog.Info("migrations applied")
-
-	// database pool
-	pool, err := pgxpool.New(ctx, cfg.DB_DSN)
-	if err != nil {
-		zapLog.Fatal("failed to connect database", zap.Error(err))
-	}
-	defer pool.Close()
-	zapLog.Info("database connected")
-
-	// redis cache
-	rdb := redis.NewClient(&redis.Options{
-		Addr: cfg.REDIS_URL,
-	})
-	zapLog.Info("redis client created")
-
-	// dependencies
-	repo := repo.New(pool)
-	cache := cache.New(rdb)
-	svc := service.NewWarehouseService(repo, cache, zapLog)
-	h := handler.NewWarehouseHandler(svc, zapLog)
-
-	// app
-	a := app.New(zapLog, h, cfg)
-
-	go func() {
-		if err := a.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			a.Logger().Error("app stopped with error", zap.Error(err))
-		}
-	}()
-
-	<-ctx.Done()
-
-	errs := a.Shutdown()
-	for _, err := range errs {
-		if err != context.Canceled {
-			a.Logger().Error("shutdown error", zap.Error(err))
-		}
+		logger.Fatal("app.Build", zap.Error(err))
 	}
 
-	a.Logger().Info("app stopped")
+	a.Run(ctx)
 }

@@ -22,7 +22,7 @@ type pgProductRepository struct {
 	pool *pgxpool.Pool
 }
 
-func New(pool *pgxpool.Pool) ProductRepository {
+func NewProductRepo(pool *pgxpool.Pool) ProductRepository {
 	return &pgProductRepository{pool: pool}
 }
 

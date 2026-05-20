@@ -19,16 +19,6 @@ func NewWarehouseHandler(svc *service.WarehouseService, logger *zap.Logger) *War
 	return &WarehouseHandler{svc: svc, logger: logger}
 }
 
-func (h *WarehouseHandler) RegisterRoutes(r *gin.Engine) {
-	r.POST("/products", h.CreateProduct)
-	r.GET("/products/:id", h.GetProductByID)
-	r.DELETE("/products/:id", h.DeleteProduct)
-	r.PUT("/products/:id/restore", h.RestoreProduct)
-	r.GET("/products/search", h.SearchProducts)
-	r.PATCH("/products/:id", h.PatchProducts)
-	r.GET("/products", h.ListProducts)
-}
-
 func (h *WarehouseHandler) CreateProduct(c *gin.Context) {
 	var req domain.CreateProductParams
 	if err := c.ShouldBindJSON(&req); err != nil {
