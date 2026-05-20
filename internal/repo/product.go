@@ -3,7 +3,6 @@ package repo
 import (
 	"context"
 
-	"warehouse-controller/internal/domain"
 	"warehouse-controller/internal/repo/dbmodel"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -152,21 +151,3 @@ func (r *pgProductRepository) List(ctx context.Context, limit, offset int32) ([]
 	return products, rows.Err()
 }
 
-func ToDomainProduct(p *dbmodel.Product) *domain.Product {
-	return &domain.Product{
-		ID:           p.ID,
-		ProductName:  p.ProductName,
-		Manufacturer: p.Manufacturer,
-		Category:     p.Category,
-		Price:        p.Price,
-		Count:        p.Count,
-	}
-}
-
-func ToDomainProducts(products []dbmodel.Product) []domain.Product {
-	result := make([]domain.Product, len(products))
-	for i, p := range products {
-		result[i] = *ToDomainProduct(&p)
-	}
-	return result
-}

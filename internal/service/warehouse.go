@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -40,13 +39,9 @@ func (s *WarehouseService) CreateProduct(ctx context.Context, req domain.CreateP
 func (s *WarehouseService) GetProductByID(ctx context.Context, req domain.GetProductParams) (*domain.Product, error) {
 	key := fmt.Sprintf("product:%d", req.ID)
 
-	data, err := s.cache.Get(ctx, key)
-	if err == nil {
-		var cached domain.Product
-		if json.Unmarshal(data, &cached) == nil {
-			s.log.Debug("cache hit", zap.Int64("id", req.ID))
-			return &cached, nil
-		}
+	if cached, err := cache.GetProduct(ctx, s.cache, key); err == nil {
+		s.log.Debug("cache hit", zap.Int64("id", req.ID))
+		return cached.ToDomain(), nil
 	}
 
 	dbProduct, err := s.repo.GetByID(ctx, req.ID)
@@ -57,10 +52,9 @@ func (s *WarehouseService) GetProductByID(ctx context.Context, req domain.GetPro
 		return nil, nil
 	}
 
-	domainProduct := repo.ToDomainProduct(dbProduct)
-	data, err = json.Marshal(domainProduct)
-	if err == nil {
-		s.cache.Set(ctx, key, data, cacheTTL)
+	domainProduct := dbProduct.ToDomain()
+	if err := cache.SetProduct(ctx, s.cache, key, cache.FromDomain(domainProduct), cacheTTL); err != nil {
+		s.log.Warn("cache set failed", zap.Error(err))
 	}
 
 	return domainProduct, nil
@@ -78,19 +72,15 @@ func (s *WarehouseService) RestoreProduct(ctx context.Context, req domain.Restor
 	if dbProduct == nil {
 		return nil, nil
 	}
-	return repo.ToDomainProduct(dbProduct), nil
+	return dbProduct.ToDomain(), nil
 }
 
 func (s *WarehouseService) SearchProducts(ctx context.Context, req domain.SearchProductsParams) ([]domain.Product, error) {
 	key := fmt.Sprintf("products:search:%s", hashSearchParams(req))
 
-	data, err := s.cache.Get(ctx, key)
-	if err == nil {
-		var cached []domain.Product
-		if json.Unmarshal(data, &cached) == nil {
-			s.log.Debug("cache hit search")
-			return cached, nil
-		}
+	if cached, err := cache.GetProducts(ctx, s.cache, key); err == nil {
+		s.log.Debug("cache hit search")
+		return cache.ToDomainSlice(cached), nil
 	}
 
 	dbProducts, err := s.repo.Search(ctx, dbmodel.ProductFilter{
@@ -106,10 +96,9 @@ func (s *WarehouseService) SearchProducts(ctx context.Context, req domain.Search
 		return nil, err
 	}
 
-	domainProducts := repo.ToDomainProducts(dbProducts)
-	cacheData, err := json.Marshal(domainProducts)
-	if err == nil {
-		s.cache.Set(ctx, key, cacheData, cacheTTL)
+	domainProducts := dbmodel.ToDomainSlice(dbProducts)
+	if err := cache.SetProducts(ctx, s.cache, key, cache.FromDomainSlice(domainProducts), cacheTTL); err != nil {
+		s.log.Warn("cache set failed", zap.Error(err))
 	}
 
 	return domainProducts, nil
@@ -129,19 +118,15 @@ func (s *WarehouseService) PatchProduct(ctx context.Context, req domain.PatchPro
 	if dbProduct == nil {
 		return nil, nil
 	}
-	return repo.ToDomainProduct(dbProduct), nil
+	return dbProduct.ToDomain(), nil
 }
 
 func (s *WarehouseService) ListProducts(ctx context.Context, req domain.ListProductsParams) ([]domain.Product, error) {
 	key := fmt.Sprintf("products:list:%d:%d", req.Limit, req.Offset)
 
-	data, err := s.cache.Get(ctx, key)
-	if err == nil {
-		var cached []domain.Product
-		if json.Unmarshal(data, &cached) == nil {
-			s.log.Debug("cache hit list", zap.Int32("limit", req.Limit), zap.Int32("offset", req.Offset))
-			return cached, nil
-		}
+	if cached, err := cache.GetProducts(ctx, s.cache, key); err == nil {
+		s.log.Debug("cache hit list", zap.Int32("limit", req.Limit), zap.Int32("offset", req.Offset))
+		return cache.ToDomainSlice(cached), nil
 	}
 
 	dbProducts, err := s.repo.List(ctx, req.Limit, req.Offset)
@@ -149,10 +134,9 @@ func (s *WarehouseService) ListProducts(ctx context.Context, req domain.ListProd
 		return nil, err
 	}
 
-	domainProducts := repo.ToDomainProducts(dbProducts)
-	cacheData, err := json.Marshal(domainProducts)
-	if err == nil {
-		s.cache.Set(ctx, key, cacheData, cacheTTL)
+	domainProducts := dbmodel.ToDomainSlice(dbProducts)
+	if err := cache.SetProducts(ctx, s.cache, key, cache.FromDomainSlice(domainProducts), cacheTTL); err != nil {
+		s.log.Warn("cache set failed", zap.Error(err))
 	}
 
 	return domainProducts, nil

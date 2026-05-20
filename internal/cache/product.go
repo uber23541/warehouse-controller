@@ -1,32 +1,14 @@
-package dbmodel
+package cache
 
 import "warehouse-controller/internal/domain"
 
 type Product struct {
-	ID           int64
-	ProductName  string
-	Manufacturer string
-	Category     string
-	Count        int32
-	Price        int64
-}
-
-type ProductFilter struct {
-	ProductName  *string
-	Manufacturer *string
-	Category     *string
-	MinPrice     *int64
-	MaxPrice     *int64
-	Limit        int32
-	Offset       int32
-}
-
-type ProductPatch struct {
-	ProductName  *string
-	Manufacturer *string
-	Category     *string
-	Count        *int32
-	Price        *int64
+	ID           int64  `json:"id"`
+	ProductName  string `json:"product_name"`
+	Manufacturer string `json:"manufacturer"`
+	Category     string `json:"category"`
+	Price        int64  `json:"price"`
+	Count        int32  `json:"count"`
 }
 
 func FromDomain(p *domain.Product) *Product {
@@ -38,9 +20,17 @@ func FromDomain(p *domain.Product) *Product {
 		ProductName:  p.ProductName,
 		Manufacturer: p.Manufacturer,
 		Category:     p.Category,
-		Count:        p.Count,
 		Price:        p.Price,
+		Count:        p.Count,
 	}
+}
+
+func FromDomainSlice(products []domain.Product) []Product {
+	result := make([]Product, len(products))
+	for i := range products {
+		result[i] = *FromDomain(&products[i])
+	}
+	return result
 }
 
 func (p *Product) ToDomain() *domain.Product {
