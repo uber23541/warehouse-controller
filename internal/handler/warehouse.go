@@ -15,10 +15,25 @@ type WarehouseHandler struct {
 	logger *zap.Logger
 }
 
+type CreateProductResponse struct {
+	ID int64 `json:"id"`
+}
+
 func NewWarehouseHandler(svc *service.WarehouseService, logger *zap.Logger) *WarehouseHandler {
 	return &WarehouseHandler{svc: svc, logger: logger}
 }
 
+// CreateProduct godoc
+// @Summary      Создать продукт
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Param        request  body      domain.CreateProductParams  true  "Параметры нового продукта"
+// @Success      201      {object}  handler.CreateProductResponse
+// @Failure      400      {object}  handler.ErrorResponse
+// @Failure      500      {object}  handler.ErrorResponse
+// @Security     BearerAuth
+// @Router       /products [post]
 func (h *WarehouseHandler) CreateProduct(c *gin.Context) {
 	var req domain.CreateProductParams
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -37,6 +52,16 @@ func (h *WarehouseHandler) CreateProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": id})
 }
 
+// GetProductByID godoc
+// @Summary      Получить продукт по ID
+// @Tags         products
+// @Produce      json
+// @Param        id   path      int  true  "ID продукта"
+// @Success      200  {object}  domain.Product
+// @Failure      400  {object}  handler.ErrorResponse
+// @Failure      500  {object}  handler.ErrorResponse
+// @Security     BearerAuth
+// @Router       /products/{id} [get]
 func (h *WarehouseHandler) GetProductByID(c *gin.Context) {
 	var req domain.GetProductParams
 	if err := c.ShouldBindUri(&req); err != nil {
@@ -55,6 +80,15 @@ func (h *WarehouseHandler) GetProductByID(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// DeleteProduct godoc
+// @Summary      Удалить продукт (soft delete)
+// @Tags         products
+// @Param        id   path  int  true  "ID продукта"
+// @Success      204
+// @Failure      400  {object}  handler.ErrorResponse
+// @Failure      500  {object}  handler.ErrorResponse
+// @Security     BearerAuth
+// @Router       /products/{id} [delete]
 func (h *WarehouseHandler) DeleteProduct(c *gin.Context) {
 	var req domain.DeleteProductParams
 	if err := c.ShouldBindUri(&req); err != nil {
@@ -72,6 +106,16 @@ func (h *WarehouseHandler) DeleteProduct(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// RestoreProduct godoc
+// @Summary      Восстановить ранее удалённый продукт
+// @Tags         products
+// @Produce      json
+// @Param        id   path      int  true  "ID продукта"
+// @Success      200  {object}  domain.Product
+// @Failure      400  {object}  handler.ErrorResponse
+// @Failure      500  {object}  handler.ErrorResponse
+// @Security     BearerAuth
+// @Router       /products/{id}/restore [put]
 func (h *WarehouseHandler) RestoreProduct(c *gin.Context) {
 	var req domain.RestoreProductParams
 	if err := c.ShouldBindUri(&req); err != nil {
@@ -90,6 +134,23 @@ func (h *WarehouseHandler) RestoreProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// SearchProducts godoc
+// @Summary      Поиск продуктов
+// @Description  Фильтрация продуктов по имени, производителю, категории и диапазону цены
+// @Tags         products
+// @Produce      json
+// @Param        product_name   query     string  false  "Подстрока в названии"
+// @Param        manufacturer   query     string  false  "Производитель"
+// @Param        category       query     string  false  "Категория"
+// @Param        min_price      query     int     false  "Минимальная цена"
+// @Param        max_price      query     int     false  "Максимальная цена"
+// @Param        limit          query     int     false  "Лимит результатов"
+// @Param        offset         query     int     false  "Смещение"
+// @Success      200            {array}   domain.Product
+// @Failure      400            {object}  handler.ErrorResponse
+// @Failure      500            {object}  handler.ErrorResponse
+// @Security     BearerAuth
+// @Router       /products/search [get]
 func (h *WarehouseHandler) SearchProducts(c *gin.Context) {
 	var req domain.SearchProductsParams
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -108,13 +169,33 @@ func (h *WarehouseHandler) SearchProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
+// PatchProducts godoc
+// @Summary      Частичное обновление продукта
+// @Tags         products
+// @Accept       json
+// @Produce      json
+// @Param        id       path      int                         true  "ID продукта"
+// @Param        request  body      domain.PatchProductParams   true  "Поля для обновления"
+// @Success      200      {object}  domain.Product
+// @Failure      400      {object}  handler.ErrorResponse
+// @Failure      500      {object}  handler.ErrorResponse
+// @Security     BearerAuth
+// @Router       /products/{id} [patch]
 func (h *WarehouseHandler) PatchProducts(c *gin.Context) {
+	var uri domain.PatchProductURI
+	if err := c.ShouldBindUri(&uri); err != nil {
+		h.logger.Error("failed to bind URI parameters", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URI parameters"})
+		return
+	}
+
 	var req domain.PatchProductParams
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Error("failed to bind request body", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+	req.ID = uri.ID
 
 	product, err := h.svc.PatchProduct(c.Request.Context(), req)
 	if err != nil {
@@ -126,6 +207,17 @@ func (h *WarehouseHandler) PatchProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// ListProducts godoc
+// @Summary      Список продуктов
+// @Tags         products
+// @Produce      json
+// @Param        limit   query     int  false  "Лимит результатов"
+// @Param        offset  query     int  false  "Смещение"
+// @Success      200     {array}   domain.Product
+// @Failure      400     {object}  handler.ErrorResponse
+// @Failure      500     {object}  handler.ErrorResponse
+// @Security     BearerAuth
+// @Router       /products [get]
 func (h *WarehouseHandler) ListProducts(c *gin.Context) {
 	var req domain.ListProductsParams
 	if err := c.ShouldBindQuery(&req); err != nil {

@@ -15,10 +15,22 @@ type AuthHandler struct {
 	logger *zap.Logger
 }
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 func NewAuthHandler(svc *service.AuthService, logger *zap.Logger) *AuthHandler {
 	return &AuthHandler{svc: svc, logger: logger}
 }
 
+// Token godoc
+// @Summary      Выдать пару токенов
+// @Description  Создаёт новую пару access/refresh токенов без проверки учётных данных
+// @Tags         auth
+// @Produce      json
+// @Success      200  {object}  service.TokenPair
+// @Failure      500  {object}  handler.ErrorResponse
+// @Router       /auth/token [post]
 func (h *AuthHandler) Token(c *gin.Context) {
 	pair, err := h.svc.IssuePair(c.Request.Context())
 	if err != nil {
@@ -33,6 +45,18 @@ type refreshRequest struct {
 	Refresh string `json:"refresh" binding:"required"`
 }
 
+// Refresh godoc
+// @Summary      Обновить пару токенов
+// @Description  Принимает действующий refresh-токен и возвращает новую пару
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      refreshRequest  true  "Refresh-токен"
+// @Success      200      {object}  service.TokenPair
+// @Failure      400      {object}  handler.ErrorResponse
+// @Failure      401      {object}  handler.ErrorResponse
+// @Failure      500      {object}  handler.ErrorResponse
+// @Router       /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req refreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

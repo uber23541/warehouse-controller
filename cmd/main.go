@@ -9,10 +9,19 @@ import (
 	"warehouse-controller/internal/app"
 	"warehouse-controller/internal/config"
 
+	_ "warehouse-controller/docs"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+// @title           Warehouse Controller API
+// @version         1.0
+// @description     API для управления складом
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

@@ -45,7 +45,11 @@ func Build(ctx context.Context, cfg config.Config, logger *zap.Logger) (*App, er
 	logger.Info("database connected")
 	productRepo := repo.NewProductRepo(pool)
 
-	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.URL})
+	redisOpts, err := redis.ParseURL(cfg.Redis.URL)
+	if err != nil {
+		return nil, fmt.Errorf("redis parse url: %w", err)
+	}
+	rdb := redis.NewClient(redisOpts)
 	logger.Info("redis client created")
 	sharedCache := cache.New(rdb)
 	sessionStore := sessioncache.New(sharedCache)
