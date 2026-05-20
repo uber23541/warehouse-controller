@@ -8,6 +8,7 @@ import (
 
 	"warehouse-controller/internal/auth"
 	"warehouse-controller/internal/cache"
+	sessioncache "warehouse-controller/internal/cache/session"
 	"warehouse-controller/internal/config"
 	"warehouse-controller/internal/handler"
 	"warehouse-controller/internal/repo"
@@ -46,13 +47,13 @@ func Build(ctx context.Context, cfg config.Config, logger *zap.Logger) (*App, er
 
 	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.URL})
 	logger.Info("redis client created")
-	productCache := cache.New(rdb)
-	sessionRepo := repo.NewSessionRepo(rdb)
+	sharedCache := cache.New(rdb)
+	sessionStore := sessioncache.New(sharedCache)
 
 	issuer := auth.NewIssuer(cfg.Auth.JWTSecret, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL)
 
-	warehouseSvc := service.NewWarehouseService(productRepo, productCache, logger)
-	authSvc := service.NewAuthService(issuer, sessionRepo)
+	warehouseSvc := service.NewWarehouseService(productRepo, sharedCache, logger)
+	authSvc := service.NewAuthService(issuer, sessionStore)
 
 	warehouseH := handler.NewWarehouseHandler(warehouseSvc, logger)
 	authH := handler.NewAuthHandler(authSvc, logger)

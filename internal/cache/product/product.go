@@ -1,6 +1,13 @@
-package cache
+package productcache
 
-import "warehouse-controller/internal/domain"
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"warehouse-controller/internal/cache"
+	"warehouse-controller/internal/domain"
+)
 
 type Product struct {
 	ID           int64  `json:"id"`
@@ -53,4 +60,44 @@ func ToDomainSlice(products []Product) []domain.Product {
 		result[i] = *products[i].ToDomain()
 	}
 	return result
+}
+
+func SetProduct(ctx context.Context, c cache.Cache, key string, p *Product, ttl time.Duration) error {
+	data, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	return c.Set(ctx, key, data, ttl)
+}
+
+func GetProduct(ctx context.Context, c cache.Cache, key string) (*Product, error) {
+	data, err := c.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	var p Product
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func SetProducts(ctx context.Context, c cache.Cache, key string, products []Product, ttl time.Duration) error {
+	data, err := json.Marshal(products)
+	if err != nil {
+		return err
+	}
+	return c.Set(ctx, key, data, ttl)
+}
+
+func GetProducts(ctx context.Context, c cache.Cache, key string) ([]Product, error) {
+	data, err := c.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	var products []Product
+	if err := json.Unmarshal(data, &products); err != nil {
+		return nil, err
+	}
+	return products, nil
 }

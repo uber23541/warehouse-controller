@@ -6,7 +6,8 @@ import (
 	"fmt"
 
 	"warehouse-controller/internal/auth"
-	"warehouse-controller/internal/repo"
+	"warehouse-controller/internal/cache"
+	sessioncache "warehouse-controller/internal/cache/session"
 
 	"github.com/google/uuid"
 )
@@ -20,10 +21,10 @@ type TokenPair struct {
 
 type AuthService struct {
 	issuer   *auth.Issuer
-	sessions *repo.SessionRepo
+	sessions *sessioncache.Store
 }
 
-func NewAuthService(issuer *auth.Issuer, sessions *repo.SessionRepo) *AuthService {
+func NewAuthService(issuer *auth.Issuer, sessions *sessioncache.Store) *AuthService {
 	return &AuthService{issuer: issuer, sessions: sessions}
 }
 
@@ -39,7 +40,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (TokenPa
 
 	storedJTI, err := s.sessions.GetRefreshJTI(ctx, claims.Subject)
 	if err != nil {
-		if errors.Is(err, repo.ErrSessionNotFound) {
+		if errors.Is(err, cache.ErrNotFound) {
 			return TokenPair{}, ErrRefreshRejected
 		}
 		return TokenPair{}, fmt.Errorf("refresh: %w", err)

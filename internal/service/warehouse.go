@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"warehouse-controller/internal/cache"
+	productcache "warehouse-controller/internal/cache/product"
 	"warehouse-controller/internal/domain"
 	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/repo/dbmodel"
@@ -22,8 +23,8 @@ type WarehouseService struct {
 	log   *zap.Logger
 }
 
-func NewWarehouseService(repo repo.ProductRepository, c cache.Cache, log *zap.Logger) *WarehouseService {
-	return &WarehouseService{repo: repo, cache: c, log: log}
+func NewWarehouseService(r repo.ProductRepository, c cache.Cache, log *zap.Logger) *WarehouseService {
+	return &WarehouseService{repo: r, cache: c, log: log}
 }
 
 func (s *WarehouseService) CreateProduct(ctx context.Context, req domain.CreateProductParams) (int64, error) {
@@ -39,7 +40,7 @@ func (s *WarehouseService) CreateProduct(ctx context.Context, req domain.CreateP
 func (s *WarehouseService) GetProductByID(ctx context.Context, req domain.GetProductParams) (*domain.Product, error) {
 	key := fmt.Sprintf("product:%d", req.ID)
 
-	if cached, err := cache.GetProduct(ctx, s.cache, key); err == nil {
+	if cached, err := productcache.GetProduct(ctx, s.cache, key); err == nil {
 		s.log.Debug("cache hit", zap.Int64("id", req.ID))
 		return cached.ToDomain(), nil
 	}
@@ -53,7 +54,7 @@ func (s *WarehouseService) GetProductByID(ctx context.Context, req domain.GetPro
 	}
 
 	domainProduct := dbProduct.ToDomain()
-	if err := cache.SetProduct(ctx, s.cache, key, cache.FromDomain(domainProduct), cacheTTL); err != nil {
+	if err := productcache.SetProduct(ctx, s.cache, key, productcache.FromDomain(domainProduct), cacheTTL); err != nil {
 		s.log.Warn("cache set failed", zap.Error(err))
 	}
 
@@ -78,9 +79,9 @@ func (s *WarehouseService) RestoreProduct(ctx context.Context, req domain.Restor
 func (s *WarehouseService) SearchProducts(ctx context.Context, req domain.SearchProductsParams) ([]domain.Product, error) {
 	key := fmt.Sprintf("products:search:%s", hashSearchParams(req))
 
-	if cached, err := cache.GetProducts(ctx, s.cache, key); err == nil {
+	if cached, err := productcache.GetProducts(ctx, s.cache, key); err == nil {
 		s.log.Debug("cache hit search")
-		return cache.ToDomainSlice(cached), nil
+		return productcache.ToDomainSlice(cached), nil
 	}
 
 	dbProducts, err := s.repo.Search(ctx, dbmodel.ProductFilter{
@@ -97,7 +98,7 @@ func (s *WarehouseService) SearchProducts(ctx context.Context, req domain.Search
 	}
 
 	domainProducts := dbmodel.ToDomainSlice(dbProducts)
-	if err := cache.SetProducts(ctx, s.cache, key, cache.FromDomainSlice(domainProducts), cacheTTL); err != nil {
+	if err := productcache.SetProducts(ctx, s.cache, key, productcache.FromDomainSlice(domainProducts), cacheTTL); err != nil {
 		s.log.Warn("cache set failed", zap.Error(err))
 	}
 
@@ -124,9 +125,9 @@ func (s *WarehouseService) PatchProduct(ctx context.Context, req domain.PatchPro
 func (s *WarehouseService) ListProducts(ctx context.Context, req domain.ListProductsParams) ([]domain.Product, error) {
 	key := fmt.Sprintf("products:list:%d:%d", req.Limit, req.Offset)
 
-	if cached, err := cache.GetProducts(ctx, s.cache, key); err == nil {
+	if cached, err := productcache.GetProducts(ctx, s.cache, key); err == nil {
 		s.log.Debug("cache hit list", zap.Int32("limit", req.Limit), zap.Int32("offset", req.Offset))
-		return cache.ToDomainSlice(cached), nil
+		return productcache.ToDomainSlice(cached), nil
 	}
 
 	dbProducts, err := s.repo.List(ctx, req.Limit, req.Offset)
@@ -135,7 +136,7 @@ func (s *WarehouseService) ListProducts(ctx context.Context, req domain.ListProd
 	}
 
 	domainProducts := dbmodel.ToDomainSlice(dbProducts)
-	if err := cache.SetProducts(ctx, s.cache, key, cache.FromDomainSlice(domainProducts), cacheTTL); err != nil {
+	if err := productcache.SetProducts(ctx, s.cache, key, productcache.FromDomainSlice(domainProducts), cacheTTL); err != nil {
 		s.log.Warn("cache set failed", zap.Error(err))
 	}
 

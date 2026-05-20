@@ -2,9 +2,11 @@ package repo
 
 import (
 	"context"
+	"fmt"
 
 	"warehouse-controller/internal/repo/dbmodel"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -27,57 +29,104 @@ func NewProductRepo(pool *pgxpool.Pool) ProductRepository {
 }
 
 func (r *pgProductRepository) Create(ctx context.Context, product *dbmodel.Product) (int64, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
 	var id int64
-	err := r.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO products (product_name, manufacturer, category, count, price)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`, product.ProductName, product.Manufacturer, product.Category, product.Count, product.Price).Scan(&id)
-	return id, err
+	if err != nil {
+		return 0, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("commit: %w", err)
+	}
+	return id, nil
 }
 
 func (r *pgProductRepository) GetByID(ctx context.Context, id int64) (*dbmodel.Product, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	var p dbmodel.Product
+	err = tx.QueryRow(ctx, `
 		SELECT id, product_name, manufacturer, category, count, price
 		FROM products
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
-
-	var p dbmodel.Product
-	err := row.Scan(&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price)
+	`, id).Scan(&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
 	}
 	return &p, nil
 }
 
 func (r *pgProductRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	if _, err := tx.Exec(ctx, `
 		UPDATE products
 		SET deleted_at = NOW(), updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
-	return err
+	`, id); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
 }
 
 func (r *pgProductRepository) Restore(ctx context.Context, id int64) (*dbmodel.Product, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	var p dbmodel.Product
+	err = tx.QueryRow(ctx, `
 		UPDATE products
 		SET deleted_at = NULL, updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NOT NULL
 		RETURNING id, product_name, manufacturer, category, count, price
-	`, id)
-
-	var p dbmodel.Product
-	err := row.Scan(&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price)
+	`, id).Scan(&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
 	}
 	return &p, nil
 }
 
 func (r *pgProductRepository) Search(ctx context.Context, filter dbmodel.ProductFilter) ([]dbmodel.Product, error) {
-	rows, err := r.pool.Query(ctx, `
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	rows, err := tx.Query(ctx, `
 		SELECT id, product_name, manufacturer, category, count, price
 		FROM products
 		WHERE deleted_at IS NULL
@@ -102,11 +151,26 @@ func (r *pgProductRepository) Search(ctx context.Context, filter dbmodel.Product
 		}
 		products = append(products, p)
 	}
-	return products, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+	return products, nil
 }
 
 func (r *pgProductRepository) Patch(ctx context.Context, id int64, patch dbmodel.ProductPatch) (*dbmodel.Product, error) {
-	row := r.pool.QueryRow(ctx, `
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	var p dbmodel.Product
+	err = tx.QueryRow(ctx, `
 		UPDATE products
 		SET
 			product_name = COALESCE($1::text, product_name),
@@ -117,18 +181,27 @@ func (r *pgProductRepository) Patch(ctx context.Context, id int64, patch dbmodel
 			updated_at = NOW()
 		WHERE id = $6 AND deleted_at IS NULL
 		RETURNING id, product_name, manufacturer, category, count, price
-	`, patch.ProductName, patch.Manufacturer, patch.Category, patch.Count, patch.Price, id)
-
-	var p dbmodel.Product
-	err := row.Scan(&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price)
+	`, patch.ProductName, patch.Manufacturer, patch.Category, patch.Count, patch.Price, id).Scan(
+		&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price,
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
 	}
 	return &p, nil
 }
 
 func (r *pgProductRepository) List(ctx context.Context, limit, offset int32) ([]dbmodel.Product, error) {
-	rows, err := r.pool.Query(ctx, `
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	rows, err := tx.Query(ctx, `
 		SELECT id, product_name, manufacturer, category, count, price
 		FROM products
 		WHERE deleted_at IS NULL
@@ -148,6 +221,13 @@ func (r *pgProductRepository) List(ctx context.Context, limit, offset int32) ([]
 		}
 		products = append(products, p)
 	}
-	return products, rows.Err()
-}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
 
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+	return products, nil
+}
