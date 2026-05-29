@@ -1,0 +1,21 @@
+# Имя релиза ДОЛЖНО быть warehouse-postgresql — на него ссылается host в DB_DSN.
+auth:
+  username: warehouse
+  database: warehouse_db
+  # Пароль из нашего Secret — задаётся в одном месте.
+  existingSecret: warehouse-secrets
+  secretKeys:
+    userPasswordKey: DB_PASSWORD
+    adminPasswordKey: DB_PASSWORD
+
+primary:
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

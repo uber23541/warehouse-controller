@@ -94,3 +94,27 @@ docker-build:
 .PHONY: clean
 clean:
 	rm -rf bin/
+
+# --- Kubernetes (minikube) ---
+K8S_DIR := deploy/k8s
+K8S_NS  := warehouse
+
+## k8s-deps: добавить Helm-репо Bitnami и установить Postgres + Redis
+.PHONY: k8s-deps
+k8s-deps:
+	helm repo add bitnami https://charts.bitnami.com/bitnami
+	helm repo update
+	kubectl apply -f $(K8S_DIR)/namespace.yaml
+	helm upgrade --install warehouse-postgresql bitnami/postgresql -n $(K8S_NS) -f $(K8S_DIR)/helm/postgres-values.yaml
+	helm upgrade --install warehouse-redis bitnami/redis -n $(K8S_NS) -f $(K8S_DIR)/helm/redis-values.yaml
+
+## k8s-up: применить манифесты приложения (configmap, deployment, service, ingress)
+.PHONY: k8s-up
+k8s-up:
+	kubectl apply -k $(K8S_DIR)
+
+## k8s-down: удалить ресурсы приложения и Helm-релизы
+.PHONY: k8s-down
+k8s-down:
+	kubectl delete -k $(K8S_DIR) --ignore-not-found
+	helm uninstall warehouse-postgresql warehouse-redis -n $(K8S_NS) || true

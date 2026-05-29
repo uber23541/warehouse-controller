@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"time"
 
 	"warehouse-controller/internal/auth"
@@ -17,6 +18,8 @@ func BuildRouter(warehouseH *WarehouseHandler, authH *AuthHandler, issuer *auth.
 	r := gin.New()
 	r.Use(ginzap.Ginzap(logger, time.RFC3339, true))
 	r.Use(ginzap.RecoveryWithZap(logger, true))
+
+	r.GET("/health", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
