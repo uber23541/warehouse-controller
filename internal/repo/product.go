@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"warehouse-controller/internal/metrics"
 	"warehouse-controller/internal/repo/dbmodel"
 
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,7 @@ func NewProductRepo(pool *pgxpool.Pool) ProductRepository {
 }
 
 func (r *pgProductRepository) Create(ctx context.Context, product *dbmodel.Product) (int64, error) {
+	defer metrics.ObserveDBQuery("create")()
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return 0, fmt.Errorf("begin tx: %w", err)
@@ -52,6 +54,7 @@ func (r *pgProductRepository) Create(ctx context.Context, product *dbmodel.Produ
 }
 
 func (r *pgProductRepository) GetByID(ctx context.Context, id int64) (*dbmodel.Product, error) {
+	defer metrics.ObserveDBQuery("get_by_id")()
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -75,6 +78,7 @@ func (r *pgProductRepository) GetByID(ctx context.Context, id int64) (*dbmodel.P
 }
 
 func (r *pgProductRepository) Delete(ctx context.Context, id int64) error {
+	defer metrics.ObserveDBQuery("delete")()
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -96,6 +100,7 @@ func (r *pgProductRepository) Delete(ctx context.Context, id int64) error {
 }
 
 func (r *pgProductRepository) Restore(ctx context.Context, id int64) (*dbmodel.Product, error) {
+	defer metrics.ObserveDBQuery("restore")()
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -120,6 +125,7 @@ func (r *pgProductRepository) Restore(ctx context.Context, id int64) (*dbmodel.P
 }
 
 func (r *pgProductRepository) Search(ctx context.Context, filter dbmodel.ProductFilter) ([]dbmodel.Product, error) {
+	defer metrics.ObserveDBQuery("search")()
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -163,6 +169,7 @@ func (r *pgProductRepository) Search(ctx context.Context, filter dbmodel.Product
 }
 
 func (r *pgProductRepository) Patch(ctx context.Context, id int64, patch dbmodel.ProductPatch) (*dbmodel.Product, error) {
+	defer metrics.ObserveDBQuery("patch")()
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -195,6 +202,7 @@ func (r *pgProductRepository) Patch(ctx context.Context, id int64, patch dbmodel
 }
 
 func (r *pgProductRepository) List(ctx context.Context, limit, offset int32) ([]dbmodel.Product, error) {
+	defer metrics.ObserveDBQuery("list")()
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)

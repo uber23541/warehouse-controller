@@ -10,6 +10,7 @@ import (
 	"warehouse-controller/internal/cache"
 	sessioncache "warehouse-controller/internal/cache/session"
 	"warehouse-controller/internal/config"
+	"warehouse-controller/internal/event"
 	"warehouse-controller/internal/handler"
 	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/service"
@@ -56,19 +57,21 @@ func Build(ctx context.Context, cfg config.Config, logger *zap.Logger) (*App, er
 
 	issuer := auth.NewIssuer(cfg.Auth.JWTSecret, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL)
 
-	warehouseSvc := service.NewWarehouseService(productRepo, sharedCache, logger)
+	eventPublisher := event.NewNoopPublisher()
+
+	warehouseSvc := service.NewWarehouseService(productRepo, sharedCache, eventPublisher, logger)
 	authSvc := service.NewAuthService(issuer, sessionStore)
 
 	warehouseH := handler.NewWarehouseHandler(warehouseSvc, logger)
 	authH := handler.NewAuthHandler(authSvc, logger)
 
-	r := handler.BuildRouter(warehouseH, authH, issuer, logger)
+	router := handler.NewRouter(warehouseH, authH, issuer, logger)
 
 	return &App{
 		logger: logger,
 		server: &http.Server{
 			Addr:    ":" + cfg.HTTP.Port,
-			Handler: r,
+			Handler: router.Engine(),
 		},
 	}, nil
 }
