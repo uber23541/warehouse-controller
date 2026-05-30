@@ -4,14 +4,14 @@ import (
 	"net/http"
 	"strings"
 
-	"warehouse-controller/internal/auth"
+	"warehouse-controller/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
 const ContextSessionKey = "session_id"
 
-func AuthRequired(issuer *auth.Issuer) gin.HandlerFunc {
+func AuthRequired(authSvc *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		const prefix = "Bearer "
@@ -21,13 +21,13 @@ func AuthRequired(issuer *auth.Issuer) gin.HandlerFunc {
 		}
 		token := strings.TrimPrefix(header, prefix)
 
-		claims, err := issuer.ParseAccess(token)
+		sessionID, err := authSvc.ValidateAccess(c.Request.Context(), token)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			return
 		}
 
-		c.Set(ContextSessionKey, claims.Subject)
+		c.Set(ContextSessionKey, sessionID)
 		c.Next()
 	}
 }

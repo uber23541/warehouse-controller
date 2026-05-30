@@ -65,7 +65,7 @@ func (r *pgProductRepository) GetByID(ctx context.Context, id int64) (*dbmodel.P
 	err = tx.QueryRow(ctx, `
 		SELECT id, product_name, manufacturer, category, count, price
 		FROM products
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE id = $1 AND is_deleted = FALSE
 	`, id).Scan(&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price)
 	if err != nil {
 		return nil, err
@@ -87,8 +87,8 @@ func (r *pgProductRepository) Delete(ctx context.Context, id int64) error {
 
 	if _, err := tx.Exec(ctx, `
 		UPDATE products
-		SET deleted_at = NOW(), updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
+		SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND is_deleted = FALSE
 	`, id); err != nil {
 		return err
 	}
@@ -110,8 +110,8 @@ func (r *pgProductRepository) Restore(ctx context.Context, id int64) (*dbmodel.P
 	var p dbmodel.Product
 	err = tx.QueryRow(ctx, `
 		UPDATE products
-		SET deleted_at = NULL, updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NOT NULL
+		SET is_deleted = FALSE, deleted_at = NULL, updated_at = NOW()
+		WHERE id = $1 AND is_deleted = TRUE
 		RETURNING id, product_name, manufacturer, category, count, price
 	`, id).Scan(&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price)
 	if err != nil {
@@ -135,7 +135,7 @@ func (r *pgProductRepository) Search(ctx context.Context, filter dbmodel.Product
 	rows, err := tx.Query(ctx, `
 		SELECT id, product_name, manufacturer, category, count, price
 		FROM products
-		WHERE deleted_at IS NULL
+		WHERE is_deleted = FALSE
 		  AND ($1::text IS NULL OR product_name ILIKE '%' || $1::text || '%')
 		  AND ($2::text IS NULL OR manufacturer = $2::text)
 		  AND ($3::text IS NULL OR category = $3::text)
@@ -186,7 +186,7 @@ func (r *pgProductRepository) Patch(ctx context.Context, id int64, patch dbmodel
 			count = COALESCE($4::integer, count),
 			price = COALESCE($5::bigint, price),
 			updated_at = NOW()
-		WHERE id = $6 AND deleted_at IS NULL
+		WHERE id = $6 AND is_deleted = FALSE
 		RETURNING id, product_name, manufacturer, category, count, price
 	`, patch.ProductName, patch.Manufacturer, patch.Category, patch.Count, patch.Price, id).Scan(
 		&p.ID, &p.ProductName, &p.Manufacturer, &p.Category, &p.Count, &p.Price,
@@ -212,7 +212,7 @@ func (r *pgProductRepository) List(ctx context.Context, limit, offset int32) ([]
 	rows, err := tx.Query(ctx, `
 		SELECT id, product_name, manufacturer, category, count, price
 		FROM products
-		WHERE deleted_at IS NULL
+		WHERE is_deleted = FALSE
 		ORDER BY id DESC
 		LIMIT $1 OFFSET $2
 	`, limit, offset)

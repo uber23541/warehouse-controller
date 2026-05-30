@@ -65,7 +65,7 @@ func Build(ctx context.Context, cfg config.Config, logger *zap.Logger) (*App, er
 	warehouseH := handler.NewWarehouseHandler(warehouseSvc, logger)
 	authH := handler.NewAuthHandler(authSvc, logger)
 
-	router := handler.NewRouter(warehouseH, authH, issuer, logger)
+	router := handler.NewRouter(warehouseH, authH, authSvc, logger)
 
 	return &App{
 		logger: logger,

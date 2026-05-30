@@ -41,17 +41,20 @@ func NewIssuer(secret string, accessTTL, refreshTTL time.Duration) *Issuer {
 func (i *Issuer) AccessTTL() time.Duration  { return i.accessTTL }
 func (i *Issuer) RefreshTTL() time.Duration { return i.refreshTTL }
 
-func (i *Issuer) IssueAccess(sessionID string) (string, error) {
+func (i *Issuer) IssueAccess(sessionID string) (token, jti string, err error) {
 	now := time.Now()
+	jti = uuid.NewString()
 	claims := Claims{
 		Typ: typAccess,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   sessionID,
+			ID:        jti,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(i.accessTTL)),
 		},
 	}
-	return i.sign(claims)
+	token, err = i.sign(claims)
+	return token, jti, err
 }
 
 func (i *Issuer) IssueRefresh(sessionID string) (token, jti string, err error) {

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"warehouse-controller/internal/auth"
 	"warehouse-controller/internal/middleware"
+	"warehouse-controller/internal/service"
 
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
@@ -18,15 +18,15 @@ import (
 type Router struct {
 	warehouse *WarehouseHandler
 	auth      *AuthHandler
-	issuer    *auth.Issuer
+	authSvc   *service.AuthService
 	logger    *zap.Logger
 }
 
-func NewRouter(warehouseH *WarehouseHandler, authH *AuthHandler, issuer *auth.Issuer, logger *zap.Logger) *Router {
+func NewRouter(warehouseH *WarehouseHandler, authH *AuthHandler, authSvc *service.AuthService, logger *zap.Logger) *Router {
 	return &Router{
 		warehouse: warehouseH,
 		auth:      authH,
-		issuer:    issuer,
+		authSvc:   authSvc,
 		logger:    logger,
 	}
 }
@@ -50,7 +50,7 @@ func (r *Router) registerRoutes(e *gin.Engine) {
 	e.POST("/auth/token", r.auth.Token)
 	e.POST("/auth/refresh", r.auth.Refresh)
 
-	protected := e.Group("/", middleware.AuthRequired(r.issuer))
+	protected := e.Group("/", middleware.AuthRequired(r.authSvc))
 	protected.POST("/products", r.warehouse.CreateProduct)
 	protected.GET("/products/:id", r.warehouse.GetProductByID)
 	protected.DELETE("/products/:id", r.warehouse.DeleteProduct)
