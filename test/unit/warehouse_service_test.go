@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"warehouse-controller/internal/platform/cache"
-	productcache "warehouse-controller/internal/platform/cache/product"
 	"warehouse-controller/internal/domain"
 	cachemock "warehouse-controller/internal/mocks/cache"
 	postgresmock "warehouse-controller/internal/mocks/postgres"
 	repomock "warehouse-controller/internal/mocks/repo"
 	servicemock "warehouse-controller/internal/mocks/service"
 	"warehouse-controller/internal/outbox"
+	"warehouse-controller/internal/platform/cache"
+	productcache "warehouse-controller/internal/platform/cache/product"
 	"warehouse-controller/internal/repo/dbmodel"
 	"warehouse-controller/internal/service"
 

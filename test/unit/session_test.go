@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	cachemock "warehouse-controller/internal/mocks/cache"
 	"warehouse-controller/internal/platform/cache"
 	sessioncache "warehouse-controller/internal/platform/cache/session"
-	cachemock "warehouse-controller/internal/mocks/cache"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"warehouse-controller/internal/platform/cache"
 	"warehouse-controller/internal/domain"
+	"warehouse-controller/internal/platform/cache"
 )
 
 type Product struct {

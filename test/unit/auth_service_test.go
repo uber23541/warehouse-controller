@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"warehouse-controller/internal/auth"
+	cachemock "warehouse-controller/internal/mocks/cache"
 	"warehouse-controller/internal/platform/cache"
 	sessioncache "warehouse-controller/internal/platform/cache/session"
-	cachemock "warehouse-controller/internal/mocks/cache"
 	"warehouse-controller/internal/service"
 
 	"github.com/stretchr/testify/assert"

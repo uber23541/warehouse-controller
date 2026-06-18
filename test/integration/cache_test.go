@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"warehouse-controller/internal/domain"
 	"warehouse-controller/internal/platform/cache"
 	productcache "warehouse-controller/internal/platform/cache/product"
 	sessioncache "warehouse-controller/internal/platform/cache/session"
-	"warehouse-controller/internal/domain"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

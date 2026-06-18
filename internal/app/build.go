@@ -7,11 +7,11 @@ import (
 	"net/http"
 
 	"warehouse-controller/internal/auth"
-	"warehouse-controller/internal/platform/cache"
-	sessioncache "warehouse-controller/internal/platform/cache/session"
 	"warehouse-controller/internal/config"
 	"warehouse-controller/internal/handler"
 	"warehouse-controller/internal/outbox"
+	"warehouse-controller/internal/platform/cache"
+	sessioncache "warehouse-controller/internal/platform/cache/session"
 	"warehouse-controller/internal/platform/postgres"
 	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/service"

@@ -14,6 +14,7 @@ linters:
         - (*database/sql.DB).Close
         - (github.com/jackc/pgx/v5.Tx).Rollback
         - (*go.uber.org/zap.Logger).Sync
+        - (*github.com/segmentio/kafka-go.Reader).Close
 
 formatters:
   enable:
