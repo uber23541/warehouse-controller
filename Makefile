@@ -15,11 +15,17 @@ DOCS_DIR   := docs
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed -E 's/## //'
 
-## install-tools: установить golangci-lint и swag нужных версий
+## install-tools: установить golangci-lint, swag и mockery нужных версий
 .PHONY: install-tools
 install-tools:
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 	go install github.com/swaggo/swag/cmd/swag@latest
+	go install github.com/vektra/mockery/v2@v2.53.3
+
+## mocks: сгенерировать моки по .mockery.yaml
+.PHONY: mocks
+mocks:
+	mockery
 
 ## fmt: отформатировать код (gofmt + goimports через golangci-lint)
 .PHONY: fmt
@@ -41,10 +47,27 @@ vet:
 lint:
 	golangci-lint run ./...
 
-## test: прогнать тесты с детектором гонок
+## test: прогнать юнит-тесты с детектором гонок
 .PHONY: test
 test:
-	go test ./... -race -count=1
+	go test ./test/unit/... -race -count=1
+
+## test-integration: прогнать интеграционные тесты (требуется Docker)
+.PHONY: test-integration
+test-integration:
+	go test -tags=integration ./test/integration/... -count=1
+
+## cover: посчитать покрытие юнит-тестами (итог в строке total:)
+.PHONY: cover
+cover:
+	go test ./test/unit/... -coverpkg=./internal/... -coverprofile=cover.out -count=1
+	go tool cover -func=cover.out
+
+## cover-html: открыть HTML-отчёт покрытия
+.PHONY: cover-html
+cover-html:
+	go test ./test/unit/... -coverpkg=./internal/... -coverprofile=cover.out -count=1
+	go tool cover -html=cover.out
 
 ## tidy: привести go.mod/go.sum в порядок
 .PHONY: tidy

@@ -1,17 +1,23 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
-
-	"warehouse-controller/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
 const ContextSessionKey = "session_id"
 
-func AuthRequired(authSvc *service.AuthService) gin.HandlerFunc {
+// AccessValidator проверяет access-токен и возвращает идентификатор сессии.
+// Узкий интерфейс позволяет подменять auth-сервис в тестах; его удовлетворяет
+// *service.AuthService.
+type AccessValidator interface {
+	ValidateAccess(ctx context.Context, accessToken string) (string, error)
+}
+
+func AuthRequired(authSvc AccessValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		const prefix = "Bearer "

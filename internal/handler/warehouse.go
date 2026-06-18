@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"context"
+
 	"warehouse-controller/internal/domain"
-	"warehouse-controller/internal/service"
 
 	"net/http"
 
@@ -10,8 +11,18 @@ import (
 	"go.uber.org/zap"
 )
 
+type WarehouseService interface {
+	CreateProduct(ctx context.Context, req domain.CreateProductParams) (int64, error)
+	GetProductByID(ctx context.Context, req domain.GetProductParams) (*domain.Product, error)
+	DeleteProduct(ctx context.Context, req domain.DeleteProductParams) error
+	RestoreProduct(ctx context.Context, req domain.RestoreProductParams) (*domain.Product, error)
+	SearchProducts(ctx context.Context, req domain.SearchProductsParams) ([]domain.Product, error)
+	PatchProduct(ctx context.Context, req domain.PatchProductParams) (*domain.Product, error)
+	ListProducts(ctx context.Context, req domain.ListProductsParams) ([]domain.Product, error)
+}
+
 type WarehouseHandler struct {
-	svc    *service.WarehouseService
+	svc    WarehouseService
 	logger *zap.Logger
 }
 
@@ -19,7 +30,7 @@ type CreateProductResponse struct {
 	ID int64 `json:"id"`
 }
 
-func NewWarehouseHandler(svc *service.WarehouseService, logger *zap.Logger) *WarehouseHandler {
+func NewWarehouseHandler(svc WarehouseService, logger *zap.Logger) *WarehouseHandler {
 	return &WarehouseHandler{svc: svc, logger: logger}
 }
 

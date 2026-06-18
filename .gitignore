@@ -1,3 +1,5 @@
 .env
 
 deploy/k8s/secret.yaml
+
+*.exe

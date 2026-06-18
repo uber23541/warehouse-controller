@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -10,8 +11,13 @@ import (
 	"go.uber.org/zap"
 )
 
+type AuthService interface {
+	IssuePair(ctx context.Context) (service.TokenPair, error)
+	Refresh(ctx context.Context, refreshToken string) (service.TokenPair, error)
+}
+
 type AuthHandler struct {
-	svc    *service.AuthService
+	svc    AuthService
 	logger *zap.Logger
 }
 
@@ -19,7 +25,7 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func NewAuthHandler(svc *service.AuthService, logger *zap.Logger) *AuthHandler {
+func NewAuthHandler(svc AuthService, logger *zap.Logger) *AuthHandler {
 	return &AuthHandler{svc: svc, logger: logger}
 }
 

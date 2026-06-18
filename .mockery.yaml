@@ -1,0 +1,26 @@
+quiet: false
+disable-version-string: true
+with-expecter: true
+resolve-type-alias: false
+issue-845-fix: true
+dir: "internal/mocks/{{.PackageName}}"
+mockname: "Mock{{.InterfaceName}}"
+outpkg: "{{.PackageName}}mock"
+filename: "{{.InterfaceName | snakecase}}.go"
+packages:
+  warehouse-controller/internal/repo:
+    interfaces:
+      ProductRepository:
+  warehouse-controller/internal/cache:
+    interfaces:
+      Cache:
+  warehouse-controller/internal/event:
+    interfaces:
+      Publisher:
+  warehouse-controller/internal/handler:
+    interfaces:
+      WarehouseService:
+      AuthService:
+  warehouse-controller/internal/middleware:
+    interfaces:
+      AccessValidator:
