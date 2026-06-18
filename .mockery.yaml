@@ -11,12 +11,15 @@ packages:
   warehouse-controller/internal/repo:
     interfaces:
       ProductRepository:
-  warehouse-controller/internal/cache:
+  warehouse-controller/internal/platform/cache:
     interfaces:
       Cache:
-  warehouse-controller/internal/event:
+  warehouse-controller/internal/platform/postgres:
     interfaces:
-      Publisher:
+      Transactor:
+  warehouse-controller/internal/service:
+    interfaces:
+      OutboxStore:
   warehouse-controller/internal/handler:
     interfaces:
       WarehouseService:

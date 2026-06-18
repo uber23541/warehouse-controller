@@ -6,11 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"warehouse-controller/internal/cache"
-	productcache "warehouse-controller/internal/cache/product"
+	"warehouse-controller/internal/platform/cache"
+	productcache "warehouse-controller/internal/platform/cache/product"
 	"warehouse-controller/internal/domain"
 	"warehouse-controller/internal/event"
 	"warehouse-controller/internal/metrics"
+	"warehouse-controller/internal/outbox"
+	"warehouse-controller/internal/platform/postgres"
 	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/repo/dbmodel"
 
@@ -18,44 +20,63 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+// OutboxStore сохраняет события в transactional outbox в текущей транзакции.
+type OutboxStore interface {
+	Save(ctx context.Context, rec outbox.Record) error
+}
+
 const cacheTTL = 10 * time.Second
 
 type WarehouseService struct {
 	repo   repo.ProductRepository
 	cache  cache.Cache
-	events event.Publisher
+	txm    postgres.Transactor
+	outbox OutboxStore
 	log    *zap.Logger
 	sf     singleflight.Group
 }
 
-func NewWarehouseService(r repo.ProductRepository, c cache.Cache, events event.Publisher, log *zap.Logger) *WarehouseService {
-	return &WarehouseService{repo: r, cache: c, events: events, log: log}
+func NewWarehouseService(r repo.ProductRepository, c cache.Cache, txm postgres.Transactor, ob OutboxStore, log *zap.Logger) *WarehouseService {
+	return &WarehouseService{repo: r, cache: c, txm: txm, outbox: ob, log: log}
 }
 
 func (s *WarehouseService) CreateProduct(ctx context.Context, req domain.CreateProductParams) (int64, error) {
-	id, err := s.repo.Create(ctx, &dbmodel.Product{
-		ProductName:  req.ProductName,
-		Manufacturer: req.Manufacturer,
-		Category:     req.Category,
-		Count:        req.Count,
-		Price:        req.Price,
+	var id int64
+	err := s.txm.WithinTx(ctx, func(ctx context.Context) error {
+		var err error
+		id, err = s.repo.Create(ctx, &dbmodel.Product{
+			ProductName:  req.ProductName,
+			Manufacturer: req.Manufacturer,
+			Category:     req.Category,
+			Count:        req.Count,
+			Price:        req.Price,
+		})
+		if err != nil {
+			return err
+		}
+
+		return s.publish(ctx, event.ProductCreated{
+			ID:           id,
+			ProductName:  req.ProductName,
+			Manufacturer: req.Manufacturer,
+			Category:     req.Category,
+			Price:        req.Price,
+			Count:        req.Count,
+		})
 	})
 	if err != nil {
 		return 0, err
 	}
-
-	if err := s.events.Publish(ctx, event.ProductCreated{
-		ID:           id,
-		ProductName:  req.ProductName,
-		Manufacturer: req.Manufacturer,
-		Category:     req.Category,
-		Price:        req.Price,
-		Count:        req.Count,
-	}); err != nil {
-		s.log.Warn("publish product.created failed", zap.Int64("id", id), zap.Error(err))
-	}
-
 	return id, nil
+}
+
+// publish сериализует событие и кладёт его в outbox в текущей транзакции.
+func (s *WarehouseService) publish(ctx context.Context, e event.Event) error {
+	topic, key, payload, err := event.Encode(e)
+	if err != nil {
+		return err
+	}
+	return s.outbox.Save(ctx, outbox.Record{Topic: topic, Key: key, Payload: payload})
 }
 
 func (s *WarehouseService) GetProductByID(ctx context.Context, req domain.GetProductParams) (*domain.Product, error) {
@@ -96,15 +117,12 @@ func (s *WarehouseService) GetProductByID(ctx context.Context, req domain.GetPro
 }
 
 func (s *WarehouseService) DeleteProduct(ctx context.Context, req domain.DeleteProductParams) error {
-	if err := s.repo.Delete(ctx, req.ID); err != nil {
-		return err
-	}
-
-	if err := s.events.Publish(ctx, event.ProductDeleted{ID: req.ID}); err != nil {
-		s.log.Warn("publish product.deleted failed", zap.Int64("id", req.ID), zap.Error(err))
-	}
-
-	return nil
+	return s.txm.WithinTx(ctx, func(ctx context.Context) error {
+		if err := s.repo.Delete(ctx, req.ID); err != nil {
+			return err
+		}
+		return s.publish(ctx, event.ProductDeleted{ID: req.ID})
+	})
 }
 
 func (s *WarehouseService) RestoreProduct(ctx context.Context, req domain.RestoreProductParams) (*domain.Product, error) {

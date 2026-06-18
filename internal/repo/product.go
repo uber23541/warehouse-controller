@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"warehouse-controller/internal/metrics"
+	"warehouse-controller/internal/platform/postgres"
 	"warehouse-controller/internal/repo/dbmodel"
 
 	"github.com/jackc/pgx/v5"
@@ -31,24 +32,18 @@ func NewProductRepo(pool *pgxpool.Pool) ProductRepository {
 
 func (r *pgProductRepository) Create(ctx context.Context, product *dbmodel.Product) (int64, error) {
 	defer metrics.ObserveDBQuery("create")()
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
-	if err != nil {
-		return 0, fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(context.Background())
+	// Querier берёт транзакцию из контекста (если открыта TxManager.WithinTx),
+	// иначе работает напрямую через пул как одиночный стейтмент.
+	q := postgres.Querier(ctx, r.pool)
 
 	var id int64
-	err = tx.QueryRow(ctx, `
+	err := q.QueryRow(ctx, `
 		INSERT INTO products (product_name, manufacturer, category, count, price)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`, product.ProductName, product.Manufacturer, product.Category, product.Count, product.Price).Scan(&id)
 	if err != nil {
 		return 0, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return 0, fmt.Errorf("commit: %w", err)
 	}
 	return id, nil
 }
@@ -79,22 +74,14 @@ func (r *pgProductRepository) GetByID(ctx context.Context, id int64) (*dbmodel.P
 
 func (r *pgProductRepository) Delete(ctx context.Context, id int64) error {
 	defer metrics.ObserveDBQuery("delete")()
-	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(context.Background())
+	q := postgres.Querier(ctx, r.pool)
 
-	if _, err := tx.Exec(ctx, `
+	if _, err := q.Exec(ctx, `
 		UPDATE products
 		SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
 		WHERE id = $1 AND is_deleted = FALSE
 	`, id); err != nil {
 		return err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit: %w", err)
 	}
 	return nil
 }

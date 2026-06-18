@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"warehouse-controller/internal/auth"
-	"warehouse-controller/internal/cache"
-	sessioncache "warehouse-controller/internal/cache/session"
+	"warehouse-controller/internal/platform/cache"
+	sessioncache "warehouse-controller/internal/platform/cache/session"
 	cachemock "warehouse-controller/internal/mocks/cache"
 	"warehouse-controller/internal/service"
 

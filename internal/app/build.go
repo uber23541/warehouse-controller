@@ -7,11 +7,12 @@ import (
 	"net/http"
 
 	"warehouse-controller/internal/auth"
-	"warehouse-controller/internal/cache"
-	sessioncache "warehouse-controller/internal/cache/session"
+	"warehouse-controller/internal/platform/cache"
+	sessioncache "warehouse-controller/internal/platform/cache/session"
 	"warehouse-controller/internal/config"
-	"warehouse-controller/internal/event"
 	"warehouse-controller/internal/handler"
+	"warehouse-controller/internal/outbox"
+	"warehouse-controller/internal/platform/postgres"
 	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/service"
 
@@ -19,6 +20,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/redis/go-redis/v9"
+	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
 
@@ -57,9 +59,17 @@ func Build(ctx context.Context, cfg config.Config, logger *zap.Logger) (*App, er
 
 	issuer := auth.NewIssuer(cfg.Auth.JWTSecret, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL)
 
-	eventPublisher := event.NewNoopPublisher()
+	txManager := postgres.NewTxManager(pool)
+	outboxStore := outbox.NewStore(pool)
 
-	warehouseSvc := service.NewWarehouseService(productRepo, sharedCache, eventPublisher, logger)
+	kafkaWriter := &kafka.Writer{
+		Addr:                   kafka.TCP(cfg.Kafka.Brokers...),
+		Balancer:               &kafka.Hash{},
+		AllowAutoTopicCreation: true,
+	}
+	relay := outbox.NewRelay(outboxStore, kafkaWriter, logger, cfg.Kafka.RelayInterval, cfg.Kafka.RelayBatch)
+
+	warehouseSvc := service.NewWarehouseService(productRepo, sharedCache, txManager, outboxStore, logger)
 	authSvc := service.NewAuthService(issuer, sessionStore)
 
 	warehouseH := handler.NewWarehouseHandler(warehouseSvc, logger)
@@ -68,7 +78,10 @@ func Build(ctx context.Context, cfg config.Config, logger *zap.Logger) (*App, er
 	router := handler.NewRouter(warehouseH, authH, authSvc, logger)
 
 	return &App{
-		logger: logger,
+		logger:      logger,
+		pool:        pool,
+		relay:       relay,
+		kafkaWriter: kafkaWriter,
 		server: &http.Server{
 			Addr:    ":" + cfg.HTTP.Port,
 			Handler: router.Engine(),

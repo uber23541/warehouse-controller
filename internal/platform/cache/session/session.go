@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"warehouse-controller/internal/cache"
+	"warehouse-controller/internal/platform/cache"
 )
 
 type Store struct {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"warehouse-controller/internal/cache"
+	"warehouse-controller/internal/platform/cache"
 	"warehouse-controller/internal/domain"
 )
 

@@ -30,6 +30,30 @@ services:
       timeout: 3s
       retries: 10
 
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kafka-warehouse
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
   app:
     container_name: warehouse-controller
     build:
@@ -40,16 +64,37 @@ services:
         condition: 'service_healthy'
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      DB_DSN:    ${DB_DSN}
-      HTTP_PORT: ${HTTP_PORT}
-      REDIS_URL: ${REDIS_URL}
+      DB_DSN:        ${DB_DSN}
+      HTTP_PORT:     ${HTTP_PORT}
+      REDIS_URL:     ${REDIS_URL}
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
     ports:
       - "${HTTP_PORT}:${HTTP_PORT}"
+
+  consumer:
+    container_name: warehouse-consumer
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["./consumer"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      KAFKA_BROKERS:  ${KAFKA_BROKERS}
+      KAFKA_TOPICS:   ${KAFKA_TOPICS}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
 
 volumes:
   dbdata:
   redisdata:
+  kafkadata:

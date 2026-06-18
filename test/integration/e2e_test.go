@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"warehouse-controller/internal/auth"
-	"warehouse-controller/internal/cache"
-	sessioncache "warehouse-controller/internal/cache/session"
-	"warehouse-controller/internal/event"
+	"warehouse-controller/internal/platform/cache"
+	sessioncache "warehouse-controller/internal/platform/cache/session"
 	"warehouse-controller/internal/handler"
+	"warehouse-controller/internal/outbox"
+	"warehouse-controller/internal/platform/postgres"
 	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/service"
 
@@ -29,10 +30,13 @@ func buildEngine(t *testing.T) *gin.Engine {
 	t.Helper()
 	log := zap.NewNop()
 
-	productRepo := repo.NewProductRepo(startPostgres(t))
+	pool := startPostgres(t)
+	productRepo := repo.NewProductRepo(pool)
 	redisCache := cache.New(startRedis(t))
 
-	warehouseSvc := service.NewWarehouseService(productRepo, redisCache, event.NewNoopPublisher(), log)
+	txm := postgres.NewTxManager(pool)
+	outboxStore := outbox.NewStore(pool)
+	warehouseSvc := service.NewWarehouseService(productRepo, redisCache, txm, outboxStore, log)
 	issuer := auth.NewIssuer("e2e-secret", 15*time.Minute, time.Hour)
 	authSvc := service.NewAuthService(issuer, sessioncache.New(redisCache))
 

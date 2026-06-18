@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"warehouse-controller/internal/cache"
-	productcache "warehouse-controller/internal/cache/product"
+	"warehouse-controller/internal/platform/cache"
+	productcache "warehouse-controller/internal/platform/cache/product"
 	"warehouse-controller/internal/domain"
 	cachemock "warehouse-controller/internal/mocks/cache"
-	eventmock "warehouse-controller/internal/mocks/event"
+	postgresmock "warehouse-controller/internal/mocks/postgres"
 	repomock "warehouse-controller/internal/mocks/repo"
+	servicemock "warehouse-controller/internal/mocks/service"
+	"warehouse-controller/internal/outbox"
 	"warehouse-controller/internal/repo/dbmodel"
 	"warehouse-controller/internal/service"
 
@@ -24,13 +26,24 @@ import (
 	"go.uber.org/zap"
 )
 
-func newWarehouseService(t *testing.T) (*service.WarehouseService, *repomock.MockProductRepository, *cachemock.MockCache, *eventmock.MockPublisher) {
+func newWarehouseService(t *testing.T) (*service.WarehouseService, *repomock.MockProductRepository, *cachemock.MockCache, *servicemock.MockOutboxStore) {
 	t.Helper()
 	r := repomock.NewMockProductRepository(t)
 	c := cachemock.NewMockCache(t)
-	p := eventmock.NewMockPublisher(t)
-	svc := service.NewWarehouseService(r, c, p, zap.NewNop())
-	return svc, r, c, p
+	ob := servicemock.NewMockOutboxStore(t)
+	txm := postgresmock.NewMockTransactor(t)
+	// Транзакция в тестах прозрачна: просто выполняем переданную функцию.
+	txm.EXPECT().WithinTx(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		}).Maybe()
+	svc := service.NewWarehouseService(r, c, txm, ob, zap.NewNop())
+	return svc, r, c, ob
+}
+
+// outboxTopic матчит запись outbox по имени топика.
+func outboxTopic(name string) func(outbox.Record) bool {
+	return func(rec outbox.Record) bool { return rec.Topic == name }
 }
 
 func marshalProduct(t *testing.T, p *domain.Product) []byte {
@@ -47,56 +60,50 @@ func marshalProducts(t *testing.T, ps []domain.Product) []byte {
 	return data
 }
 
-func isEvent(name string) func(any) bool {
-	return func(e any) bool {
-		ev, ok := e.(interface{ EventName() string })
-		return ok && ev.EventName() == name
-	}
-}
-
 func TestWarehouseService_CreateProduct(t *testing.T) {
 	createErr := errors.New("insert failed")
+	outboxErr := errors.New("outbox down")
 
 	tests := []struct {
 		name    string
 		req     domain.CreateProductParams
-		setup   func(r *repomock.MockProductRepository, p *eventmock.MockPublisher)
+		setup   func(r *repomock.MockProductRepository, ob *servicemock.MockOutboxStore)
 		wantID  int64
 		wantErr error
 	}{
 		{
-			name: "ok: создаёт и публикует событие",
+			name: "ok: создаёт и сохраняет событие в outbox",
 			req:  domain.CreateProductParams{ProductName: "Молоток", Manufacturer: "Зубр", Category: "Инструменты", Count: 5, Price: 1299},
-			setup: func(r *repomock.MockProductRepository, p *eventmock.MockPublisher) {
+			setup: func(r *repomock.MockProductRepository, ob *servicemock.MockOutboxStore) {
 				r.EXPECT().Create(context.Background(), &dbmodel.Product{ProductName: "Молоток", Manufacturer: "Зубр", Category: "Инструменты", Count: 5, Price: 1299}).
 					Return(int64(42), nil).Once()
-				p.EXPECT().Publish(context.Background(), mock.MatchedBy(isEvent("product.created"))).Return(nil).Once()
+				ob.EXPECT().Save(context.Background(), mock.MatchedBy(outboxTopic("product.created"))).Return(nil).Once()
 			},
 			wantID: 42,
 		},
 		{
-			name: "repo error",
+			name: "repo error: событие не пишется",
 			req:  domain.CreateProductParams{},
-			setup: func(r *repomock.MockProductRepository, _ *eventmock.MockPublisher) {
+			setup: func(r *repomock.MockProductRepository, _ *servicemock.MockOutboxStore) {
 				r.EXPECT().Create(context.Background(), mock.Anything).Return(int64(0), createErr).Once()
 			},
 			wantErr: createErr,
 		},
 		{
-			name: "ошибка публикации не валит операцию",
+			name: "ошибка outbox откатывает операцию",
 			req:  domain.CreateProductParams{ProductName: "X"},
-			setup: func(r *repomock.MockProductRepository, p *eventmock.MockPublisher) {
+			setup: func(r *repomock.MockProductRepository, ob *servicemock.MockOutboxStore) {
 				r.EXPECT().Create(context.Background(), mock.Anything).Return(int64(7), nil).Once()
-				p.EXPECT().Publish(context.Background(), mock.Anything).Return(errors.New("broker down")).Once()
+				ob.EXPECT().Save(context.Background(), mock.Anything).Return(outboxErr).Once()
 			},
-			wantID: 7,
+			wantErr: outboxErr,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, r, _, p := newWarehouseService(t)
-			tt.setup(r, p)
+			svc, r, _, ob := newWarehouseService(t)
+			tt.setup(r, ob)
 
 			id, err := svc.CreateProduct(context.Background(), tt.req)
 
@@ -300,19 +307,19 @@ func TestWarehouseService_DeleteProduct(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		setup   func(r *repomock.MockProductRepository, p *eventmock.MockPublisher)
+		setup   func(r *repomock.MockProductRepository, ob *servicemock.MockOutboxStore)
 		wantErr error
 	}{
 		{
-			name: "ok: удаляет и публикует событие",
-			setup: func(r *repomock.MockProductRepository, p *eventmock.MockPublisher) {
+			name: "ok: удаляет и сохраняет событие в outbox",
+			setup: func(r *repomock.MockProductRepository, ob *servicemock.MockOutboxStore) {
 				r.EXPECT().Delete(context.Background(), int64(5)).Return(nil).Once()
-				p.EXPECT().Publish(context.Background(), mock.MatchedBy(isEvent("product.deleted"))).Return(nil).Once()
+				ob.EXPECT().Save(context.Background(), mock.MatchedBy(outboxTopic("product.deleted"))).Return(nil).Once()
 			},
 		},
 		{
 			name: "repo error",
-			setup: func(r *repomock.MockProductRepository, _ *eventmock.MockPublisher) {
+			setup: func(r *repomock.MockProductRepository, _ *servicemock.MockOutboxStore) {
 				r.EXPECT().Delete(context.Background(), int64(5)).Return(deleteErr).Once()
 			},
 			wantErr: deleteErr,
@@ -321,8 +328,8 @@ func TestWarehouseService_DeleteProduct(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, r, _, p := newWarehouseService(t)
-			tt.setup(r, p)
+			svc, r, _, ob := newWarehouseService(t)
+			tt.setup(r, ob)
 
 			err := svc.DeleteProduct(context.Background(), domain.DeleteProductParams{ID: 5})
 
