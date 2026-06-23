@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warehouse-consumer
+  namespace: warehouse
+  labels:
+    app.kubernetes.io/name: warehouse-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: warehouse-consumer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: warehouse-consumer
+    spec:
+      # KRaft-брокер поднимается дольше, чем consumer, и открывает TCP-порт
+      # 9092 ещё до того, как готов обслуживать API (group coordinator,
+      # metadata). Проверки порта (nc) недостаточно: consumer присоединится к
+      # ещё не готовому координатору и зависнет на первом ReadMessage. Поэтому
+      # ждём ответа брокера на реальный API-запрос — тем же способом, что и
+      # healthcheck в docker-compose.
+      initContainers:
+        - name: wait-for-kafka
+          image: apache/kafka:3.7.0
+          command:
+            - sh
+            - -c
+            - "until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 >/dev/null 2>&1; do echo 'waiting for kafka broker'; sleep 3; done"
+      containers:
+        - name: warehouse-consumer
+          image: ghcr.io/uber23541/warehouse-controller:latest
+          imagePullPolicy: IfNotPresent
+          command: ["./consumer"]
+          envFrom:
+            - configMapRef:
+                name: warehouse-config
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

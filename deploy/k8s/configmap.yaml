@@ -11,3 +11,8 @@ data:
   ACCESS_TTL: "15m"
   REFRESH_TTL: "168h"
   REDIS_URL: "redis://warehouse-redis-master:6379/0"
+  KAFKA_BROKERS: "kafka:9092"
+  KAFKA_TOPICS: "product.created,product.deleted"
+  KAFKA_GROUP_ID: "warehouse-sink"
+  OUTBOX_RELAY_INTERVAL: "2s"
+  OUTBOX_RELAY_BATCH: "100"

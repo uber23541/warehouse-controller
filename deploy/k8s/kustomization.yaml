@@ -6,6 +6,8 @@ namespace: warehouse
 resources:
   - namespace.yaml
   - configmap.yaml
+  - kafka.yaml
   - app-deployment.yaml
   - app-service.yaml
+  - consumer-deployment.yaml
   - ingress.yaml
