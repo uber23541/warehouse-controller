@@ -7,16 +7,22 @@ definitions:
         type: string
       count:
         example: 50
+        minimum: 0
         type: integer
       manufacturer:
         example: Зубр
         type: string
       price:
         example: 1299
+        minimum: 0
         type: integer
       product_name:
         example: Молоток
         type: string
+    required:
+    - category
+    - manufacturer
+    - product_name
     type: object
   handler.CreateProductResponse:
     properties:
@@ -34,18 +40,23 @@ definitions:
     properties:
       category:
         example: Инструменты
+        minLength: 1
         type: string
       count:
         example: 30
+        minimum: 0
         type: integer
       manufacturer:
         example: Зубр
+        minLength: 1
         type: string
       price:
         example: 1499
+        minimum: 0
         type: integer
       product_name:
         example: Молоток с резиновой ручкой
+        minLength: 1
         type: string
     type: object
   handler.ProductResponse:

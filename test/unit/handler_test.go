@@ -73,7 +73,7 @@ func TestWarehouseHandlers(t *testing.T) {
 	}{
 		{
 			name: "create: ok", method: http.MethodPost, path: "/products",
-			body: `{"product_name":"Молоток","price":100}`,
+			body: `{"product_name":"Молоток","manufacturer":"Зубр","category":"Инструменты","price":100,"count":1}`,
 			setup: func(s *handlermock.MockWarehouseService) {
 				s.EXPECT().CreateProduct(mock.Anything, mock.MatchedBy(func(p domain.CreateProductParams) bool {
 					return p.ProductName == "Молоток"
@@ -93,11 +93,29 @@ func TestWarehouseHandlers(t *testing.T) {
 			name:   "create: service error",
 			method: http.MethodPost,
 			path:   "/products",
-			body:   `{"product_name":"X"}`,
+			body:   `{"product_name":"X","manufacturer":"Y","category":"Z"}`,
 			setup: func(s *handlermock.MockWarehouseService) {
 				s.EXPECT().CreateProduct(mock.Anything, mock.Anything).Return(int64(0), errors.New("boom")).Once()
 			},
 			wantCode: http.StatusInternalServerError,
+		},
+		{
+			name:   "create: missing required fields",
+			method: http.MethodPost, path: "/products",
+			body:     `{"product_name":"Молоток"}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:   "create: negative price",
+			method: http.MethodPost, path: "/products",
+			body:     `{"product_name":"Молоток","manufacturer":"Зубр","category":"Инструменты","price":-1}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:   "create: negative count",
+			method: http.MethodPost, path: "/products",
+			body:     `{"product_name":"Молоток","manufacturer":"Зубр","category":"Инструменты","price":1,"count":-5}`,
+			wantCode: http.StatusBadRequest,
 		},
 		{
 			name: "get: ok", method: http.MethodGet, path: "/products/7",
@@ -165,6 +183,24 @@ func TestWarehouseHandlers(t *testing.T) {
 			wantCode: http.StatusBadRequest,
 		},
 		{
+			name:     "list: zero limit",
+			method:   http.MethodGet,
+			path:     "/products?limit=0",
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "list: limit above max",
+			method:   http.MethodGet,
+			path:     "/products?limit=101",
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "list: negative offset",
+			method:   http.MethodGet,
+			path:     "/products?offset=-1",
+			wantCode: http.StatusBadRequest,
+		},
+		{
 			name:   "search: ok",
 			method: http.MethodGet,
 			path:   "/products/search?product_name=Мол",
@@ -180,6 +216,12 @@ func TestWarehouseHandlers(t *testing.T) {
 			name:     "search: non-numeric min_price",
 			method:   http.MethodGet,
 			path:     "/products/search?min_price=abc",
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "search: negative min_price",
+			method:   http.MethodGet,
+			path:     "/products/search?min_price=-10",
 			wantCode: http.StatusBadRequest,
 		},
 		{
@@ -205,6 +247,23 @@ func TestWarehouseHandlers(t *testing.T) {
 			name: "patch: invalid json", method: http.MethodPatch,
 			path:     "/products/5",
 			body:     `{bad`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:   "patch: negative price",
+			method: http.MethodPatch, path: "/products/5",
+			body:     `{"price":-1}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:   "patch: empty product_name",
+			method: http.MethodPatch, path: "/products/5",
+			body:     `{"product_name":""}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:   "get: zero id",
+			method: http.MethodGet, path: "/products/0",
 			wantCode: http.StatusBadRequest,
 		},
 	}

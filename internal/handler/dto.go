@@ -10,15 +10,15 @@ type ErrorResponse struct {
 }
 
 type ProductIDURI struct {
-	ID int64 `uri:"id" binding:"required"`
+	ID int64 `uri:"id" binding:"required,gt=0"`
 }
 
 type CreateProductRequest struct {
-	ProductName  string `json:"product_name" example:"Молоток"`
-	Manufacturer string `json:"manufacturer" example:"Зубр"`
-	Category     string `json:"category"     example:"Инструменты"`
-	Price        int64  `json:"price"        example:"1299"`
-	Count        int32  `json:"count"        example:"50"`
+	ProductName  string `json:"product_name" binding:"required"  example:"Молоток"`
+	Manufacturer string `json:"manufacturer" binding:"required"  example:"Зубр"`
+	Category     string `json:"category"     binding:"required"  example:"Инструменты"`
+	Price        int64  `json:"price"        binding:"gte=0"     example:"1299"`
+	Count        int32  `json:"count"        binding:"gte=0"     example:"50"`
 }
 
 func (r CreateProductRequest) toDomain() domain.CreateProductParams {
@@ -35,10 +35,10 @@ type SearchProductsRequest struct {
 	ProductName  *string `form:"product_name"`
 	Manufacturer *string `form:"manufacturer"`
 	Category     *string `form:"category"`
-	MinPrice     *int64  `form:"min_price"`
-	MaxPrice     *int64  `form:"max_price"`
-	Limit        int32   `form:"limit,default=10"`
-	Offset       int32   `form:"offset,default=0"`
+	MinPrice     *int64  `form:"min_price" binding:"omitempty,gte=0"`
+	MaxPrice     *int64  `form:"max_price" binding:"omitempty,gte=0"`
+	Limit        int32   `form:"limit,default=10"  binding:"gte=1,lte=100"`
+	Offset       int32   `form:"offset,default=0"  binding:"gte=0"`
 }
 
 func (r SearchProductsRequest) toDomain() domain.SearchProductsParams {
@@ -54,11 +54,11 @@ func (r SearchProductsRequest) toDomain() domain.SearchProductsParams {
 }
 
 type PatchProductRequest struct {
-	ProductName  *string `json:"product_name,omitempty" example:"Молоток с резиновой ручкой"`
-	Manufacturer *string `json:"manufacturer,omitempty" example:"Зубр"`
-	Category     *string `json:"category,omitempty"     example:"Инструменты"`
-	Price        *int64  `json:"price,omitempty"        example:"1499"`
-	Count        *int32  `json:"count,omitempty"        example:"30"`
+	ProductName  *string `json:"product_name,omitempty" binding:"omitempty,min=1" example:"Молоток с резиновой ручкой"`
+	Manufacturer *string `json:"manufacturer,omitempty" binding:"omitempty,min=1" example:"Зубр"`
+	Category     *string `json:"category,omitempty"     binding:"omitempty,min=1" example:"Инструменты"`
+	Price        *int64  `json:"price,omitempty"        binding:"omitempty,gte=0" example:"1499"`
+	Count        *int32  `json:"count,omitempty"        binding:"omitempty,gte=0" example:"30"`
 }
 
 func (r PatchProductRequest) toDomain(id int64) domain.PatchProductParams {
@@ -73,8 +73,8 @@ func (r PatchProductRequest) toDomain(id int64) domain.PatchProductParams {
 }
 
 type ListProductsRequest struct {
-	Limit  int32 `form:"limit,default=10"`
-	Offset int32 `form:"offset,default=0"`
+	Limit  int32 `form:"limit,default=10"  binding:"gte=1,lte=100"`
+	Offset int32 `form:"offset,default=0"  binding:"gte=0"`
 }
 
 func (r ListProductsRequest) toDomain() domain.ListProductsParams {

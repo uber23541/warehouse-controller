@@ -464,6 +464,11 @@ const docTemplate = `{
     "definitions": {
         "handler.CreateProductRequest": {
             "type": "object",
+            "required": [
+                "category",
+                "manufacturer",
+                "product_name"
+            ],
             "properties": {
                 "category": {
                     "type": "string",
@@ -471,6 +476,7 @@ const docTemplate = `{
                 },
                 "count": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 50
                 },
                 "manufacturer": {
@@ -479,6 +485,7 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 1299
                 },
                 "product_name": {
@@ -510,22 +517,27 @@ const docTemplate = `{
             "properties": {
                 "category": {
                     "type": "string",
+                    "minLength": 1,
                     "example": "Инструменты"
                 },
                 "count": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 30
                 },
                 "manufacturer": {
                     "type": "string",
+                    "minLength": 1,
                     "example": "Зубр"
                 },
                 "price": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 1499
                 },
                 "product_name": {
                     "type": "string",
+                    "minLength": 1,
                     "example": "Молоток с резиновой ручкой"
                 }
             }
