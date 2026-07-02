@@ -21,10 +21,6 @@ type AuthHandler struct {
 	logger *zap.Logger
 }
 
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
 func NewAuthHandler(svc AuthService, logger *zap.Logger) *AuthHandler {
 	return &AuthHandler{svc: svc, logger: logger}
 }
@@ -34,7 +30,7 @@ func NewAuthHandler(svc AuthService, logger *zap.Logger) *AuthHandler {
 // @Description  Создаёт новую пару access/refresh токенов без проверки учётных данных
 // @Tags         auth
 // @Produce      json
-// @Success      200  {object}  service.TokenPair
+// @Success      200  {object}  handler.TokenPairResponse
 // @Failure      500  {object}  handler.ErrorResponse
 // @Router       /auth/token [post]
 func (h *AuthHandler) Token(c *gin.Context) {
@@ -44,11 +40,7 @@ func (h *AuthHandler) Token(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue tokens"})
 		return
 	}
-	c.JSON(http.StatusOK, pair)
-}
-
-type refreshRequest struct {
-	Refresh string `json:"refresh" binding:"required"`
+	c.JSON(http.StatusOK, newTokenPairResponse(pair))
 }
 
 // Refresh godoc
@@ -57,14 +49,14 @@ type refreshRequest struct {
 // @Tags         auth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      refreshRequest  true  "Refresh-токен"
-// @Success      200      {object}  service.TokenPair
+// @Param        request  body      handler.RefreshRequest  true  "Refresh-токен"
+// @Success      200      {object}  handler.TokenPairResponse
 // @Failure      400      {object}  handler.ErrorResponse
 // @Failure      401      {object}  handler.ErrorResponse
 // @Failure      500      {object}  handler.ErrorResponse
 // @Router       /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	var req refreshRequest
+	var req RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -80,5 +72,5 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to refresh tokens"})
 		return
 	}
-	c.JSON(http.StatusOK, pair)
+	c.JSON(http.StatusOK, newTokenPairResponse(pair))
 }

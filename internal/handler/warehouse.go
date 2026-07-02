@@ -26,10 +26,6 @@ type WarehouseHandler struct {
 	logger *zap.Logger
 }
 
-type CreateProductResponse struct {
-	ID int64 `json:"id"`
-}
-
 func NewWarehouseHandler(svc WarehouseService, logger *zap.Logger) *WarehouseHandler {
 	return &WarehouseHandler{svc: svc, logger: logger}
 }
@@ -39,28 +35,28 @@ func NewWarehouseHandler(svc WarehouseService, logger *zap.Logger) *WarehouseHan
 // @Tags         products
 // @Accept       json
 // @Produce      json
-// @Param        request  body      domain.CreateProductParams  true  "Параметры нового продукта"
+// @Param        request  body      handler.CreateProductRequest  true  "Параметры нового продукта"
 // @Success      201      {object}  handler.CreateProductResponse
 // @Failure      400      {object}  handler.ErrorResponse
 // @Failure      500      {object}  handler.ErrorResponse
 // @Security     BearerAuth
 // @Router       /products [post]
 func (h *WarehouseHandler) CreateProduct(c *gin.Context) {
-	var req domain.CreateProductParams
+	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Error("failed to bind request body", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	id, err := h.svc.CreateProduct(c.Request.Context(), req)
+	id, err := h.svc.CreateProduct(c.Request.Context(), req.toDomain())
 	if err != nil {
 		h.logger.Error("failed to create product", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create product"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"id": id})
+	c.JSON(http.StatusCreated, CreateProductResponse{ID: id})
 }
 
 // GetProductByID godoc
@@ -68,27 +64,27 @@ func (h *WarehouseHandler) CreateProduct(c *gin.Context) {
 // @Tags         products
 // @Produce      json
 // @Param        id   path      int  true  "ID продукта"
-// @Success      200  {object}  domain.Product
+// @Success      200  {object}  handler.ProductResponse
 // @Failure      400  {object}  handler.ErrorResponse
 // @Failure      500  {object}  handler.ErrorResponse
 // @Security     BearerAuth
 // @Router       /products/{id} [get]
 func (h *WarehouseHandler) GetProductByID(c *gin.Context) {
-	var req domain.GetProductParams
-	if err := c.ShouldBindUri(&req); err != nil {
+	var uri ProductIDURI
+	if err := c.ShouldBindUri(&uri); err != nil {
 		h.logger.Error("failed to bind URI parameters", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URI parameters"})
 		return
 	}
 
-	product, err := h.svc.GetProductByID(c.Request.Context(), req)
+	product, err := h.svc.GetProductByID(c.Request.Context(), domain.GetProductParams{ID: uri.ID})
 	if err != nil {
 		h.logger.Error("failed to get product by ID", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get product"})
 		return
 	}
 
-	c.JSON(http.StatusOK, product)
+	h.respondProduct(c, product)
 }
 
 // DeleteProduct godoc
@@ -101,14 +97,14 @@ func (h *WarehouseHandler) GetProductByID(c *gin.Context) {
 // @Security     BearerAuth
 // @Router       /products/{id} [delete]
 func (h *WarehouseHandler) DeleteProduct(c *gin.Context) {
-	var req domain.DeleteProductParams
-	if err := c.ShouldBindUri(&req); err != nil {
+	var uri ProductIDURI
+	if err := c.ShouldBindUri(&uri); err != nil {
 		h.logger.Error("failed to bind URI parameters", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URI parameters"})
 		return
 	}
 
-	if err := h.svc.DeleteProduct(c.Request.Context(), req); err != nil {
+	if err := h.svc.DeleteProduct(c.Request.Context(), domain.DeleteProductParams{ID: uri.ID}); err != nil {
 		h.logger.Error("failed to delete product", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete product"})
 		return
@@ -122,27 +118,27 @@ func (h *WarehouseHandler) DeleteProduct(c *gin.Context) {
 // @Tags         products
 // @Produce      json
 // @Param        id   path      int  true  "ID продукта"
-// @Success      200  {object}  domain.Product
+// @Success      200  {object}  handler.ProductResponse
 // @Failure      400  {object}  handler.ErrorResponse
 // @Failure      500  {object}  handler.ErrorResponse
 // @Security     BearerAuth
 // @Router       /products/{id}/restore [put]
 func (h *WarehouseHandler) RestoreProduct(c *gin.Context) {
-	var req domain.RestoreProductParams
-	if err := c.ShouldBindUri(&req); err != nil {
+	var uri ProductIDURI
+	if err := c.ShouldBindUri(&uri); err != nil {
 		h.logger.Error("failed to bind URI parameters", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URI parameters"})
 		return
 	}
 
-	product, err := h.svc.RestoreProduct(c.Request.Context(), req)
+	product, err := h.svc.RestoreProduct(c.Request.Context(), domain.RestoreProductParams{ID: uri.ID})
 	if err != nil {
 		h.logger.Error("failed to restore product", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to restore product"})
 		return
 	}
 
-	c.JSON(http.StatusOK, product)
+	h.respondProduct(c, product)
 }
 
 // SearchProducts godoc
@@ -157,27 +153,27 @@ func (h *WarehouseHandler) RestoreProduct(c *gin.Context) {
 // @Param        max_price      query     int     false  "Максимальная цена"
 // @Param        limit          query     int     false  "Лимит результатов"
 // @Param        offset         query     int     false  "Смещение"
-// @Success      200            {array}   domain.Product
+// @Success      200            {array}   handler.ProductResponse
 // @Failure      400            {object}  handler.ErrorResponse
 // @Failure      500            {object}  handler.ErrorResponse
 // @Security     BearerAuth
 // @Router       /products/search [get]
 func (h *WarehouseHandler) SearchProducts(c *gin.Context) {
-	var req domain.SearchProductsParams
+	var req SearchProductsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.logger.Error("failed to bind query parameters", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid query parameters"})
 		return
 	}
 
-	products, err := h.svc.SearchProducts(c.Request.Context(), req)
+	products, err := h.svc.SearchProducts(c.Request.Context(), req.toDomain())
 	if err != nil {
 		h.logger.Error("failed to search products", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search products"})
 		return
 	}
 
-	c.JSON(http.StatusOK, products)
+	c.JSON(http.StatusOK, newProductResponses(products))
 }
 
 // PatchProducts godoc
@@ -185,37 +181,36 @@ func (h *WarehouseHandler) SearchProducts(c *gin.Context) {
 // @Tags         products
 // @Accept       json
 // @Produce      json
-// @Param        id       path      int                         true  "ID продукта"
-// @Param        request  body      domain.PatchProductParams   true  "Поля для обновления"
-// @Success      200      {object}  domain.Product
+// @Param        id       path      int                            true  "ID продукта"
+// @Param        request  body      handler.PatchProductRequest    true  "Поля для обновления"
+// @Success      200      {object}  handler.ProductResponse
 // @Failure      400      {object}  handler.ErrorResponse
 // @Failure      500      {object}  handler.ErrorResponse
 // @Security     BearerAuth
 // @Router       /products/{id} [patch]
 func (h *WarehouseHandler) PatchProducts(c *gin.Context) {
-	var uri domain.PatchProductURI
+	var uri ProductIDURI
 	if err := c.ShouldBindUri(&uri); err != nil {
 		h.logger.Error("failed to bind URI parameters", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URI parameters"})
 		return
 	}
 
-	var req domain.PatchProductParams
+	var req PatchProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Error("failed to bind request body", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	req.ID = uri.ID
 
-	product, err := h.svc.PatchProduct(c.Request.Context(), req)
+	product, err := h.svc.PatchProduct(c.Request.Context(), req.toDomain(uri.ID))
 	if err != nil {
 		h.logger.Error("failed to patch product", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch product"})
 		return
 	}
 
-	c.JSON(http.StatusOK, product)
+	h.respondProduct(c, product)
 }
 
 // ListProducts godoc
@@ -224,25 +219,33 @@ func (h *WarehouseHandler) PatchProducts(c *gin.Context) {
 // @Produce      json
 // @Param        limit   query     int  false  "Лимит результатов"
 // @Param        offset  query     int  false  "Смещение"
-// @Success      200     {array}   domain.Product
+// @Success      200     {array}   handler.ProductResponse
 // @Failure      400     {object}  handler.ErrorResponse
 // @Failure      500     {object}  handler.ErrorResponse
 // @Security     BearerAuth
 // @Router       /products [get]
 func (h *WarehouseHandler) ListProducts(c *gin.Context) {
-	var req domain.ListProductsParams
+	var req ListProductsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		h.logger.Error("failed to bind query parameters", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid query parameters"})
 		return
 	}
 
-	products, err := h.svc.ListProducts(c.Request.Context(), req)
+	products, err := h.svc.ListProducts(c.Request.Context(), req.toDomain())
 	if err != nil {
 		h.logger.Error("failed to list products", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list products"})
 		return
 	}
 
-	c.JSON(http.StatusOK, products)
+	c.JSON(http.StatusOK, newProductResponses(products))
+}
+
+func (h *WarehouseHandler) respondProduct(c *gin.Context, product *domain.Product) {
+	if product == nil {
+		c.JSON(http.StatusOK, nil)
+		return
+	}
+	c.JSON(http.StatusOK, newProductResponse(product))
 }

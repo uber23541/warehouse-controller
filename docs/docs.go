@@ -35,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.refreshRequest"
+                            "$ref": "#/definitions/handler.RefreshRequest"
                         }
                     }
                 ],
@@ -43,7 +43,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/service.TokenPair"
+                            "$ref": "#/definitions/handler.TokenPairResponse"
                         }
                     },
                     "400": {
@@ -81,7 +81,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/service.TokenPair"
+                            "$ref": "#/definitions/handler.TokenPairResponse"
                         }
                     },
                     "500": {
@@ -127,7 +127,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.Product"
+                                "$ref": "#/definitions/handler.ProductResponse"
                             }
                         }
                     },
@@ -168,7 +168,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/domain.CreateProductParams"
+                            "$ref": "#/definitions/handler.CreateProductRequest"
                         }
                     }
                 ],
@@ -259,7 +259,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.Product"
+                                "$ref": "#/definitions/handler.ProductResponse"
                             }
                         }
                     },
@@ -305,7 +305,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/domain.Product"
+                            "$ref": "#/definitions/handler.ProductResponse"
                         }
                     },
                     "400": {
@@ -389,7 +389,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/domain.PatchProductParams"
+                            "$ref": "#/definitions/handler.PatchProductRequest"
                         }
                     }
                 ],
@@ -397,7 +397,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/domain.Product"
+                            "$ref": "#/definitions/handler.ProductResponse"
                         }
                     },
                     "400": {
@@ -442,7 +442,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/domain.Product"
+                            "$ref": "#/definitions/handler.ProductResponse"
                         }
                     },
                     "400": {
@@ -462,7 +462,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "domain.CreateProductParams": {
+        "handler.CreateProductRequest": {
             "type": "object",
             "properties": {
                 "category": {
@@ -487,7 +487,25 @@ const docTemplate = `{
                 }
             }
         },
-        "domain.PatchProductParams": {
+        "handler.CreateProductResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "example": 42
+                }
+            }
+        },
+        "handler.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "invalid request body"
+                }
+            }
+        },
+        "handler.PatchProductRequest": {
             "type": "object",
             "properties": {
                 "category": {
@@ -512,7 +530,7 @@ const docTemplate = `{
                 }
             }
         },
-        "domain.Product": {
+        "handler.ProductResponse": {
             "type": "object",
             "properties": {
                 "category": {
@@ -541,23 +559,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.CreateProductResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handler.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                }
-            }
-        },
-        "handler.refreshRequest": {
+        "handler.RefreshRequest": {
             "type": "object",
             "required": [
                 "refresh"
@@ -568,7 +570,7 @@ const docTemplate = `{
                 }
             }
         },
-        "service.TokenPair": {
+        "handler.TokenPairResponse": {
             "type": "object",
             "properties": {
                 "access": {

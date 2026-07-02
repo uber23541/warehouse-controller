@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  domain.CreateProductParams:
+  handler.CreateProductRequest:
     properties:
       category:
         example: Инструменты
@@ -18,7 +18,19 @@ definitions:
         example: Молоток
         type: string
     type: object
-  domain.PatchProductParams:
+  handler.CreateProductResponse:
+    properties:
+      id:
+        example: 42
+        type: integer
+    type: object
+  handler.ErrorResponse:
+    properties:
+      error:
+        example: invalid request body
+        type: string
+    type: object
+  handler.PatchProductRequest:
     properties:
       category:
         example: Инструменты
@@ -36,7 +48,7 @@ definitions:
         example: Молоток с резиновой ручкой
         type: string
     type: object
-  domain.Product:
+  handler.ProductResponse:
     properties:
       category:
         example: Инструменты
@@ -57,24 +69,14 @@ definitions:
         example: Молоток
         type: string
     type: object
-  handler.CreateProductResponse:
-    properties:
-      id:
-        type: integer
-    type: object
-  handler.ErrorResponse:
-    properties:
-      error:
-        type: string
-    type: object
-  handler.refreshRequest:
+  handler.RefreshRequest:
     properties:
       refresh:
         type: string
     required:
     - refresh
     type: object
-  service.TokenPair:
+  handler.TokenPairResponse:
     properties:
       access:
         type: string
@@ -98,14 +100,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handler.refreshRequest'
+          $ref: '#/definitions/handler.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/service.TokenPair'
+            $ref: '#/definitions/handler.TokenPairResponse'
         "400":
           description: Bad Request
           schema:
@@ -131,7 +133,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/service.TokenPair'
+            $ref: '#/definitions/handler.TokenPairResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -157,7 +159,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/domain.Product'
+              $ref: '#/definitions/handler.ProductResponse'
             type: array
         "400":
           description: Bad Request
@@ -181,7 +183,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.CreateProductParams'
+          $ref: '#/definitions/handler.CreateProductRequest'
       produces:
       - application/json
       responses:
@@ -239,7 +241,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Product'
+            $ref: '#/definitions/handler.ProductResponse'
         "400":
           description: Bad Request
           schema:
@@ -267,14 +269,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/domain.PatchProductParams'
+          $ref: '#/definitions/handler.PatchProductRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Product'
+            $ref: '#/definitions/handler.ProductResponse'
         "400":
           description: Bad Request
           schema:
@@ -302,7 +304,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Product'
+            $ref: '#/definitions/handler.ProductResponse'
         "400":
           description: Bad Request
           schema:
@@ -356,7 +358,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/domain.Product'
+              $ref: '#/definitions/handler.ProductResponse'
             type: array
         "400":
           description: Bad Request
