@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"warehouse-controller/internal/domain"
-	"warehouse-controller/internal/outbox"
 	"warehouse-controller/internal/platform/postgres"
 	"warehouse-controller/internal/repo"
 	"warehouse-controller/internal/service"
@@ -28,7 +27,7 @@ func TestOutbox_ProductCreatedWritten(t *testing.T) {
 		repo.NewProductRepo(pool),
 		noopCache{},
 		postgres.NewTxManager(pool),
-		outbox.NewStore(pool),
+		repo.NewOutboxRepo(pool),
 		zap.NewNop(),
 	)
 

@@ -60,16 +60,16 @@ func Build(ctx context.Context, cfg config.Config, logger *zap.Logger) (*App, er
 	issuer := auth.NewIssuer(cfg.Auth.JWTSecret, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL)
 
 	txManager := postgres.NewTxManager(pool)
-	outboxStore := outbox.NewStore(pool)
+	outboxRepo := repo.NewOutboxRepo(pool)
 
 	kafkaWriter := &kafka.Writer{
 		Addr:                   kafka.TCP(cfg.Kafka.Brokers...),
 		Balancer:               &kafka.Hash{},
 		AllowAutoTopicCreation: true,
 	}
-	relay := outbox.NewRelay(outboxStore, kafkaWriter, logger, cfg.Kafka.RelayInterval, cfg.Kafka.RelayBatch)
+	relay := outbox.NewRelay(outboxRepo, kafkaWriter, logger, cfg.Kafka.RelayInterval, cfg.Kafka.RelayBatch)
 
-	warehouseSvc := service.NewWarehouseService(productRepo, sharedCache, txManager, outboxStore, logger)
+	warehouseSvc := service.NewWarehouseService(productRepo, sharedCache, txManager, outboxRepo, logger)
 	authSvc := service.NewAuthService(issuer, sessionStore)
 
 	warehouseH := handler.NewWarehouseHandler(warehouseSvc, logger)

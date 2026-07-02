@@ -10,14 +10,14 @@ import (
 
 // Relay периодически вычитывает неотправленные строки outbox и публикует их в Kafka.
 type Relay struct {
-	store    *Store
+	store    Repository
 	writer   *kafka.Writer
 	log      *zap.Logger
 	interval time.Duration
 	batch    int
 }
 
-func NewRelay(store *Store, writer *kafka.Writer, log *zap.Logger, interval time.Duration, batch int) *Relay {
+func NewRelay(store Repository, writer *kafka.Writer, log *zap.Logger, interval time.Duration, batch int) *Relay {
 	return &Relay{store: store, writer: writer, log: log, interval: interval, batch: batch}
 }
 
