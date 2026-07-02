@@ -227,42 +227,48 @@ func TestWarehouseService_SearchProducts_CacheHit(t *testing.T) {
 	svc, _, c, _ := newWarehouseService(t)
 	ctx := context.Background()
 
+	params := domain.SearchProductsParams{Limit: 10, Offset: 0}
 	want := []domain.Product{{ID: 1, ProductName: "A"}, {ID: 2, ProductName: "B"}}
-	c.EXPECT().Get(ctx, "products:search:10|0").Return(marshalProducts(t, want), nil).Once()
+	c.EXPECT().Get(ctx, service.HashSearchParams(params)).Return(marshalProducts(t, want), nil).Once()
 
 	got, err := svc.SearchProducts(ctx, domain.SearchProductsParams{Limit: 10, Offset: 0})
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
 
-// Формирование ключа кэша из комбинаций фильтров (косвенно проверяет
-// hashSearchParams): порядок частей и пропуск nil-полей.
 func TestWarehouseService_SearchProducts_CacheKey(t *testing.T) {
 	ptr := func(s string) *string { return &s }
 	i64 := func(v int64) *int64 { return &v }
 
 	tests := []struct {
-		name    string
-		params  domain.SearchProductsParams
-		wantKey string
+		name   string
+		params domain.SearchProductsParams
 	}{
-		{"only pagination", domain.SearchProductsParams{Limit: 10, Offset: 0}, "products:search:10|0"},
-		{"name", domain.SearchProductsParams{ProductName: ptr("foo"), Limit: 5, Offset: 2}, "products:search:foo|5|2"},
-		{"manufacturer", domain.SearchProductsParams{Manufacturer: ptr("bar"), Limit: 10, Offset: 0}, "products:search:bar|10|0"},
-		{"category", domain.SearchProductsParams{Category: ptr("cat"), Limit: 10, Offset: 0}, "products:search:cat|10|0"},
-		{"min price", domain.SearchProductsParams{MinPrice: i64(100), Limit: 10, Offset: 0}, "products:search:100|10|0"},
-		{"max price", domain.SearchProductsParams{MaxPrice: i64(500), Limit: 10, Offset: 0}, "products:search:500|10|0"},
-		{"all fields", domain.SearchProductsParams{ProductName: ptr("a"), Manufacturer: ptr("b"), Category: ptr("c"), MinPrice: i64(1), MaxPrice: i64(2), Limit: 7, Offset: 3}, "products:search:a|b|c|1|2|7|3"},
+		{"only pagination", domain.SearchProductsParams{Limit: 10, Offset: 0}},
+		{"name", domain.SearchProductsParams{ProductName: ptr("foo"), Limit: 5, Offset: 2}},
+		{"manufacturer", domain.SearchProductsParams{Manufacturer: ptr("bar"), Limit: 10, Offset: 0}},
+		{"category", domain.SearchProductsParams{Category: ptr("cat"), Limit: 10, Offset: 0}},
+		{"min price", domain.SearchProductsParams{MinPrice: i64(100), Limit: 10, Offset: 0}},
+		{"max price", domain.SearchProductsParams{MaxPrice: i64(500), Limit: 10, Offset: 0}},
+		{"all fields", domain.SearchProductsParams{ProductName: ptr("a"), Manufacturer: ptr("b"), Category: ptr("c"), MinPrice: i64(1), MaxPrice: i64(2), Limit: 7, Offset: 3}},
 	}
 
+	seen := make(map[string]string, len(tests))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			key := service.HashSearchParams(tt.params)
+			assert.Equal(t, key, service.HashSearchParams(tt.params), "ключ должен быть детерминированным")
+			if prev, ok := seen[key]; ok {
+				t.Fatalf("коллизия ключа с кейсом %q", prev)
+			}
+			seen[key] = tt.name
+
 			svc, r, c, _ := newWarehouseService(t)
 			ctx := context.Background()
 
-			c.EXPECT().Get(ctx, tt.wantKey).Return(nil, cache.ErrNotFound).Times(2)
+			c.EXPECT().Get(ctx, key).Return(nil, cache.ErrNotFound).Times(2)
 			r.EXPECT().Search(ctx, mock.Anything).Return(nil, nil).Once()
-			c.EXPECT().Set(ctx, tt.wantKey, mock.Anything, mock.Anything).Return(nil).Once()
+			c.EXPECT().Set(ctx, key, mock.Anything, mock.Anything).Return(nil).Once()
 
 			_, err := svc.SearchProducts(ctx, tt.params)
 			require.NoError(t, err)
@@ -275,7 +281,7 @@ func TestWarehouseService_SearchProducts_CacheMiss(t *testing.T) {
 	ctx := context.Background()
 
 	name := "Молот"
-	key := "products:search:Молот|20|5"
+	key := service.HashSearchParams(domain.SearchProductsParams{ProductName: &name, Limit: 20, Offset: 5})
 	c.EXPECT().Get(ctx, key).Return(nil, cache.ErrNotFound).Times(2)
 	r.EXPECT().Search(ctx, mock.MatchedBy(func(f dbmodel.ProductFilter) bool {
 		return f.ProductName != nil && *f.ProductName == "Молот" && f.Limit == 20 && f.Offset == 5

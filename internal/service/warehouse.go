@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -137,7 +139,7 @@ func (s *WarehouseService) RestoreProduct(ctx context.Context, req domain.Restor
 }
 
 func (s *WarehouseService) SearchProducts(ctx context.Context, req domain.SearchProductsParams) ([]domain.Product, error) {
-	key := fmt.Sprintf("products:search:%s", hashSearchParams(req))
+	key := HashSearchParams(req)
 
 	if cached, err := productcache.GetProducts(ctx, s.cache, key); err == nil {
 		metrics.CacheHit("search")
@@ -229,7 +231,7 @@ func (s *WarehouseService) ListProducts(ctx context.Context, req domain.ListProd
 	return v.([]domain.Product), nil
 }
 
-func hashSearchParams(req domain.SearchProductsParams) string {
+func HashSearchParams(req domain.SearchProductsParams) string {
 	var parts []string
 
 	if req.ProductName != nil {
@@ -251,8 +253,7 @@ func hashSearchParams(req domain.SearchProductsParams) string {
 	parts = append(parts, fmt.Sprintf("%d", req.Offset))
 
 	raw := strings.Join(parts, "|")
-	//sum := sha256.Sum256([]byte(raw))
+	sum := sha256.Sum256([]byte(raw))
 
-	//return hex.EncodeToString(sum[:])
-	return raw
+	return "products:search:" + hex.EncodeToString(sum[:])
 }
