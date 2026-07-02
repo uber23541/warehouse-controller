@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"warehouse-controller/internal/outbox"
 
@@ -13,12 +15,15 @@ import (
 	"go.uber.org/zap"
 )
 
+const shutdownTimeout = 30 * time.Second
+
 type App struct {
 	logger      *zap.Logger
 	server      *http.Server
 	pool        *pgxpool.Pool
 	relay       *outbox.Relay
 	kafkaWriter *kafka.Writer
+	relayWG     sync.WaitGroup
 }
 
 func (a *App) Run(ctx context.Context) {
@@ -29,7 +34,11 @@ func (a *App) Run(ctx context.Context) {
 		}
 	}()
 
-	go a.relay.Run(ctx)
+	a.relayWG.Add(1)
+	go func() {
+		defer a.relayWG.Done()
+		a.relay.Run(ctx)
+	}()
 
 	<-ctx.Done()
 
@@ -45,13 +54,17 @@ func (a *App) shutdown() []error {
 	a.logger.Info("starting graceful shutdown")
 	var errs []error
 
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
 	downs := []func(context.Context) error{
 		a.server.Shutdown,
+		func(context.Context) error { a.relayWG.Wait(); return nil },
 		func(context.Context) error { return a.kafkaWriter.Close() },
 		func(context.Context) error { a.pool.Close(); return nil },
 	}
 	for _, task := range downs {
-		if err := task(context.Background()); err != nil {
+		if err := task(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("GracefulShutdownError: %w", err))
 		}
 	}
