@@ -39,9 +39,10 @@ type AuthConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers       []string      `env:"KAFKA_BROKERS" env-default:"kafka:9092"`
-	RelayInterval time.Duration `env:"OUTBOX_RELAY_INTERVAL" env-default:"2s"`
-	RelayBatch    int           `env:"OUTBOX_RELAY_BATCH" env-default:"100"`
+	Brokers          []string      `env:"KAFKA_BROKERS" env-default:"kafka:9092"`
+	RelayInterval    time.Duration `env:"OUTBOX_RELAY_INTERVAL" env-default:"2s"`
+	RelayBatch       int           `env:"OUTBOX_RELAY_BATCH" env-default:"100"`
+	RelayMaxAttempts int           `env:"OUTBOX_RELAY_MAX_ATTEMPTS" env-default:"10"`
 }
 
 func Load() (Config, error) {

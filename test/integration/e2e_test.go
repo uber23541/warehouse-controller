@@ -34,7 +34,7 @@ func buildEngine(t *testing.T) *gin.Engine {
 	redisCache := cache.New(startRedis(t))
 
 	txm := postgres.NewTxManager(pool)
-	outboxRepo := repo.NewOutboxRepo(pool)
+	outboxRepo := repo.NewOutboxRepo(pool, 10)
 	warehouseSvc := service.NewWarehouseService(productRepo, redisCache, txm, outboxRepo, log)
 	issuer := auth.NewIssuer("e2e-secret", 15*time.Minute, time.Hour)
 	authSvc := service.NewAuthService(issuer, sessioncache.New(redisCache))
